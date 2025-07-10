@@ -23,5 +23,5 @@ toggle.addEventListener('click', () => {
 // Hamburger toggle
 hamburger.addEventListener('click', () => {
   navLinks.classList.toggle('active');
-  hamburger.textContent = navLinks.classList.contains('active') ? '✖' : '☰';
+  hamburger.classList.toggle('active');
 });
