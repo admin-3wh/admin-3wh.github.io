@@ -72,9 +72,41 @@ body.dark .nav-links a {
   color: #ddd;
 }
 
-/* Hover effect with gradient "light peeking through" */
-.nav-links a:hover {
-  background: linear-gradient(90deg, rgba(255,255,255,0.2) 0%, rgba(255,255,255,0.05) 100%);
+.nav-links a {
+  position: relative;
+  display: inline-block;
+  padding: 0.25rem 0.5rem;
+  color: #444;
+  overflow: hidden;
+}
+
+body.dark .nav-links a {
+  color: #ddd;
+}
+
+.nav-links a::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  background: radial-gradient(circle, rgba(255,255,255,0.2) 0%, transparent 80%);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  opacity: 0;
+  transition: opacity 0.2s ease, width 0.2s ease, height 0.2s ease;
+  pointer-events: none;
+}
+
+body.dark .nav-links a::before {
+  background: radial-gradient(circle, rgba(255,255,255,0.15) 0%, transparent 80%);
+}
+
+.nav-links a:hover::before {
+  opacity: 1;
+  width: 200%;
+  height: 200%;
 }
 
 body.dark .nav-links a:hover {
