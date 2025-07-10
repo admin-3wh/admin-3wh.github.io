@@ -150,6 +150,8 @@ footer {
   font-size: 0.875rem;
   background-color: inherit;
   color: inherit;
+  color: #333;
+  transition: background-color 0.3s, color 0.3s;
 }
 
 /* Dark mode body fallback (still needed) */
