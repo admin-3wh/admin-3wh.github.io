@@ -33,3 +33,12 @@ document.querySelectorAll('.nav-links a').forEach(link => {
     hamburger.classList.remove('active');
   });
 });
+
+// Close menu when Close button is clicked
+const navClose = document.getElementById('nav-close');
+if (navClose) {
+  navClose.addEventListener('click', () => {
+    navLinks.classList.remove('active');
+    hamburger.classList.remove('active');
+  });
+}
