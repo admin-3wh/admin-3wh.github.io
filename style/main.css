@@ -173,14 +173,20 @@ body.dark a:hover {
 /* Responsive nav for mobile */
 @media (max-width: 768px) {
   .nav-links {
-    position: absolute;
-    top: 64px;
-    right: 0;
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100%;
+    width: 100%;
     background-color: #f4f4f4;
     flex-direction: column;
-    width: 200px;
-    padding: 1rem;
+    justify-content: center;
+    align-items: center;
+    gap: 2rem;
+    padding: 0;
     display: none;
+    z-index: 1000;
+    transition: background-color 0.3s, color 0.3s;
   }
 
   body.dark .nav-links {
@@ -193,5 +199,8 @@ body.dark a:hover {
 
   .hamburger {
     display: block;
+    font-size: 1.5rem;
+    cursor: pointer;
+    transition: transform 0.3s ease;
   }
 }
