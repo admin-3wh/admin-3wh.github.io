@@ -15,7 +15,8 @@ html, body {
 
 a {
   text-decoration: none;
-  color: #009688;
+  color: #444;
+  transition: color 0.3s;
 }
 
 a:hover {
@@ -50,9 +51,23 @@ nav {
   font-size: 1rem;
 }
 
+.nav-links a {
+  color: #444;
+}
+
+body.dark .nav-links a {
+  color: #ddd;
+}
+
 #theme-toggle {
   cursor: pointer;
   margin-left: 1rem;
+  padding: 0.25rem 0.75rem;
+  border: 1px solid #888;
+  border-radius: 999px;
+  font-size: 0.875rem;
+  background-color: transparent;
+  transition: background-color 0.3s, color 0.3s;
 }
 
 .hamburger {
@@ -81,16 +96,23 @@ footer {
   text-align: center;
   padding: 2rem;
   font-size: 0.875rem;
+  background-color: transparent;
+  transition: background-color 0.3s, color 0.3s;
 }
 
-/* Dark Mode */
+/* Dark Mode overrides */
 body.dark {
   background-color: #121212;
   color: #f0f0f0;
 }
 
-body.dark a {
-  color: #80cbc4;
+body.dark footer {
+  background-color: #121212;
+  color: #f0f0f0;
+}
+
+body.dark a:hover {
+  color: #fff;
 }
 
 /* Responsive Navigation */
