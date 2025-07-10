@@ -113,6 +113,16 @@ body.dark .nav-links a::before {
   color: inherit;
 }
 
+.nav-close {
+  background: transparent;
+  border: 1px solid currentColor;
+  padding: 0.5rem 1rem;
+  font-size: 1rem;
+  cursor: pointer;
+  color: inherit;
+  margin-top: 2rem;
+}
+
 #theme-toggle {
   cursor: pointer;
   margin-left: 1rem;
