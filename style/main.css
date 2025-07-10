@@ -14,6 +14,16 @@ html, body {
   min-height: 100%;
 }
 
+html.dark {
+  background-color: #121212;
+  color: #f0f0f0;
+}
+
+body.dark {
+  background-color: #121212;
+  color: #f0f0f0;
+}
+
 a {
   text-decoration: none;
   color: #444;
@@ -74,6 +84,7 @@ body.dark .nav-links a {
   color: #ddd;
 }
 
+/* Glow effect on nav link hover */
 .nav-links a::before {
   content: '';
   position: absolute;
@@ -172,16 +183,6 @@ footer {
   font-size: 0.875rem;
   background-color: inherit;
   color: inherit;
-}
-
-body.dark {
-  background-color: #121212;
-  color: #f0f0f0;
-}
-
-body.dark footer {
-  background-color: #121212;
-  color: #f0f0f0;
 }
 
 body.dark a:hover {
