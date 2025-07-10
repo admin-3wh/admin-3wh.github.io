@@ -35,7 +35,6 @@ a:hover {
 }
 
 body, header, main, footer {
-  background-color: inherit;
   color: inherit;
 }
 
@@ -132,6 +131,7 @@ body.dark .nav-links a::before {
   cursor: pointer;
   display: none;
   transition: transform 0.3s ease;
+  margin-left: 1rem; /* Add space between toggle and hamburger */
 }
 
 .hamburger span {
