@@ -14,6 +14,12 @@ html, body {
   min-height: 100%;
 }
 
+/* Ensure html follows dark mode too */
+html.dark {
+  background-color: #121212;
+  color: #f0f0f0;
+}
+
 a {
   text-decoration: none;
   color: #444;
@@ -24,7 +30,7 @@ a:hover {
   text-decoration: none;
 }
 
-/* Ensure full page inherits dark background */
+/* Full page inherit dark/light mode */
 body, header, main, footer {
   background-color: inherit;
   color: inherit;
@@ -62,28 +68,20 @@ nav {
   font-size: 1rem;
 }
 
-.nav-links a {
-  color: #444;
-  padding: 0.25rem 0.5rem;
-  border-radius: 4px;
-}
-
-body.dark .nav-links a {
-  color: #ddd;
-}
-
+/* Nav link styles */
 .nav-links a {
   position: relative;
   display: inline-block;
   padding: 0.25rem 0.5rem;
-  color: #444;
   overflow: hidden;
+  color: #444;
 }
 
 body.dark .nav-links a {
   color: #ddd;
 }
 
+/* New spotlight effect on hover */
 .nav-links a::before {
   content: '';
   position: absolute;
@@ -91,7 +89,7 @@ body.dark .nav-links a {
   left: 50%;
   width: 0;
   height: 0;
-  background: radial-gradient(circle, rgba(255,255,255,0.2) 0%, transparent 80%);
+  background: radial-gradient(circle, rgba(0,0,0,0.08) 0%, transparent 70%);
   border-radius: 50%;
   transform: translate(-50%, -50%);
   opacity: 0;
@@ -100,7 +98,7 @@ body.dark .nav-links a {
 }
 
 body.dark .nav-links a::before {
-  background: radial-gradient(circle, rgba(255,255,255,0.15) 0%, transparent 80%);
+  background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
 }
 
 .nav-links a:hover::before {
@@ -109,8 +107,8 @@ body.dark .nav-links a::before {
   height: 200%;
 }
 
-body.dark .nav-links a:hover {
-  background: linear-gradient(90deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.15) 100%);
+.nav-links a:hover {
+  color: inherit;
 }
 
 #theme-toggle {
@@ -150,9 +148,11 @@ footer {
   text-align: center;
   padding: 2rem;
   font-size: 0.875rem;
+  background-color: inherit;
+  color: inherit;
 }
 
-/* Dark mode overrides */
+/* Dark mode body fallback (still needed) */
 body.dark {
   background-color: #121212;
   color: #f0f0f0;
@@ -167,7 +167,7 @@ body.dark a:hover {
   color: inherit;
 }
 
-/* Responsive navigation */
+/* Responsive nav for mobile */
 @media (max-width: 768px) {
   .nav-links {
     position: absolute;
