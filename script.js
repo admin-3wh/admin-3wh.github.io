@@ -1,18 +1,24 @@
-// Dark mode toggle
 const toggle = document.getElementById('theme-toggle');
 const hamburger = document.getElementById('hamburger');
 const navLinks = document.querySelector('.nav-links');
 
+// Load saved theme
 if (localStorage.getItem('theme') === 'dark') {
   document.body.classList.add('dark');
+  toggle.textContent = 'Light';
+} else {
+  toggle.textContent = 'Dark';
 }
 
+// Toggle theme
 toggle.addEventListener('click', () => {
   document.body.classList.toggle('dark');
-  localStorage.setItem('theme', document.body.classList.contains('dark') ? 'dark' : 'light');
+  const isDark = document.body.classList.contains('dark');
+  toggle.textContent = isDark ? 'Light' : 'Dark';
+  localStorage.setItem('theme', isDark ? 'dark' : 'light');
 });
 
-// Hamburger menu toggle
+// Hamburger toggle
 hamburger.addEventListener('click', () => {
   navLinks.classList.toggle('active');
   hamburger.textContent = navLinks.classList.contains('active') ? '✖' : '☰';
