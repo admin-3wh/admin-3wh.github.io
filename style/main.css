@@ -199,7 +199,6 @@ body.dark a:hover {
   color: inherit;
 }
 
-/* Responsive nav for mobile */
 @media (max-width: 768px) {
   .nav-links {
     position: fixed;
@@ -215,6 +214,7 @@ body.dark a:hover {
     padding: 0;
     display: none;
     z-index: 1000;
+    transition: background-color 0.3s, color 0.3s;
   }
 
   body.dark .nav-links {
@@ -226,9 +226,10 @@ body.dark a:hover {
   }
 
   .hamburger {
-  position: relative;
-  z-index: 1100; /* Ensure it appears above fullscreen nav */
-  margin-left: 1rem; /* Breathing room from toggle */
-}
+    display: block; /* Ensure hamburger shows up on mobile */
+    position: relative;
+    z-index: 1100;
+    margin-left: 1rem;
   }
+}
 }
