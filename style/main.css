@@ -226,6 +226,9 @@ body.dark a:hover {
   }
 
   .hamburger {
-    display: block;
+  position: relative;
+  z-index: 1100; /* Ensure it appears above fullscreen nav */
+  margin-left: 1rem; /* Breathing room from toggle */
+}
   }
 }
