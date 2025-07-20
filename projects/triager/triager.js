@@ -1,36 +1,33 @@
-document.getElementById('predict-btn').addEventListener('click', async () => {
-  const text = document.getElementById('ticket-text').value.trim();
-  const model = document.getElementById('model-choice').value;
-  const resultDiv = document.getElementById('result');
+document.addEventListener('DOMContentLoaded', () => {
+  const predictBtn = document.getElementById('predict-btn');
+  const output = document.getElementById('output');
 
-  if (!text) {
-    alert("Please enter ticket text.");
-    return;
-  }
+  predictBtn.addEventListener('click', async () => {
+    const ticketText = document.getElementById('ticket-text').value;
+    const modelChoice = document.getElementById('model-select').value;
 
-  resultDiv.style.display = 'block';
-  resultDiv.textContent = 'Loading...';
+    output.innerHTML = 'Loading...';
 
-  try {
-    const response = await fetch('https://triager-backend.onrender.com/predict', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ticket_text: text, model_choice: model })
-    });
+    try {
+      const response = await fetch('https://triager-backend.onrender.com/predict', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ticket_text: ticketText, model_choice: modelChoice })
+      });
 
-    if (!response.ok) {
-      throw new Error('API request failed');
+      if (!response.ok) {
+        output.innerHTML = 'Error from backend';
+        return;
+      }
+
+      const result = await response.json();
+      output.innerHTML = `
+        <strong>Category:</strong> ${result.category} (${result.category_confidence * 100}% confidence)<br>
+        <strong>Priority:</strong> ${result.priority} (${result.priority_confidence * 100}% confidence)<br>
+        <em>Model used:</em> ${result.model_used}
+      `;
+    } catch (error) {
+      output.innerHTML = 'Failed to connect to backend.';
     }
-
-    const data = await response.json();
-    resultDiv.innerHTML = `
-      <strong>Prediction:</strong><br>
-      Category: ${data.category} (${(data.category_confidence * 100).toFixed(1)}% confident)<br>
-      Priority: ${data.priority} (${(data.priority_confidence * 100).toFixed(1)}% confident)<br>
-      Model Used: ${data.model_used}
-    `;
-  } catch (err) {
-    console.error(err);
-    resultDiv.textContent = 'An error occurred. Please try again later.';
-  }
+  });
 });
