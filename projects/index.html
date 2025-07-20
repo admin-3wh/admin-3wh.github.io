@@ -6,6 +6,40 @@
   <title>Projects</title>
   <link rel="stylesheet" href="/style/main.css">
   <link rel="icon" href="/favicon.ico" type="image/x-icon">
+  <style>
+    /* Custom styles for project logos */
+    .projects-grid {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 2rem;
+      margin-top: 2rem;
+    }
+
+    .project-item {
+      text-align: center;
+      cursor: pointer;
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .project-item img {
+      width: 150px;
+      height: auto;
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .project-item:hover img {
+      transform: translateY(-4px) scale(1.05);
+      box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+    }
+
+    .project-title {
+      margin-top: 0.5rem;
+      font-size: 1rem;
+      color: inherit;
+      text-decoration: none;
+    }
+  </style>
 </head>
 <body>
   <header>
@@ -23,12 +57,21 @@
         <span></span>
         <span></span>
         <span></span>
+      </div>
     </nav>
   </header>
   <main>
     <section class="intro">
       <h1>Projects</h1>
       <p>Here’s a collection of my projects, apps, and experiments.</p>
+    </section>
+
+    <section class="projects-grid">
+      <a class="project-item" href="/projects/triager/">
+        <img src="/projects/triager/img/triager-logo.png" alt="Triager+ logo">
+        <div class="project-title">Triager+</div>
+      </a>
+      <!-- Add more project items here if needed -->
     </section>
   </main>
   <footer>
