@@ -1,49 +1,56 @@
+/* Ensure this is used for Triager+ page only */
+
 body {
-  background-color: #1e1e2f;
-  color: #f0f0f0;
+  background-color: #ffffff; /* Use your desired background color */
+  color: #222222; /* Darker text for readability */
   font-family: Arial, sans-serif;
-  margin: 0;
   padding: 1rem;
 }
 
-main {
-  max-width: 600px;
-  margin: 2rem auto;
-  padding: 1rem;
-  background-color: #2a2a40;
-  border-radius: 8px;
-  box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+h1, h2, p, label {
+  color: #222222;
 }
 
-textarea, select, button {
+a {
+  color: #000000; /* Ensure Back to Projects link is black */
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+label {
+  font-weight: bold;
+}
+
+input[type="text"],
+textarea {
   width: 100%;
+  padding: 0.75rem;
   margin-top: 0.5rem;
-  padding: 0.5rem;
+  margin-bottom: 1rem;
+  border: 1px solid #ccc;
   border-radius: 4px;
-  border: none;
+  font-size: 1rem;
 }
 
 button {
-  background-color: #4b8ce8;
-  color: #fff;
+  background-color: #333333;
+  color: #ffffff;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 4px;
   cursor: pointer;
-  transition: background-color 0.3s;
 }
 
 button:hover {
-  background-color: #3570c0;
+  background-color: #555555;
 }
 
-.result {
+.output {
   margin-top: 1rem;
   padding: 1rem;
-  background-color: #393960;
+  background-color: #f4f4f4;
   border-radius: 4px;
-}
-
-a.back-link {
-  color: #4b8ce8;
-  text-decoration: none;
-  display: inline-block;
-  margin-bottom: 1rem;
 }
