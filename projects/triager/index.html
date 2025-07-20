@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Triager+</title>
   <link rel="stylesheet" href="style.css">
-  <script src="triager.js"></script>
   <style>
     main {
       max-width: 600px;
@@ -15,11 +14,9 @@
       border-radius: 8px;
       box-shadow: 0 4px 10px rgba(0,0,0,0.1);
     }
-
     h1 {
       text-align: center;
     }
-
     textarea {
       width: 100%;
       min-height: 100px;
@@ -27,26 +24,26 @@
       margin-top: 0.5rem;
       font-size: 1rem;
     }
-
     select, button {
       margin-top: 0.5rem;
       padding: 0.5rem;
       font-size: 1rem;
       width: 100%;
     }
-
     .result {
       margin-top: 1rem;
       padding: 0.5rem;
       border: 1px solid #ccc;
       border-radius: 4px;
     }
-
     a.back-link {
       display: inline-block;
       margin-bottom: 1rem;
       text-decoration: none;
-      color: #007acc;
+      color: #000; /* Changed to black as requested */
+    }
+    p, label {
+      color: #333; /* Ensure readability */
     }
   </style>
 </head>
@@ -57,60 +54,19 @@
     <p>Enter your helpdesk ticket text below to predict category and priority.</p>
 
     <textarea id="ticket-text" placeholder="Type your ticket description here..."></textarea>
-    
-    <label for="model-choice">Model:</label>
-    <select id="model-choice">
+
+    <label for="model-select">Model:</label>
+    <select id="model-select">
       <option value="DistilBERT">DistilBERT</option>
       <option value="Naive Bayes">Naive Bayes</option>
     </select>
 
-    <button onclick="submitTicket()">Predict</button>
+    <button id="predict-btn">Predict</button>
 
-    <div id="result" class="result" style="display: none;"></div>
+    <div id="output" class="result" style="display: none;"></div>
   </main>
 
-  <script>
-    async function submitTicket() {
-      const text = document.getElementById('ticket-text').value.trim();
-      const model = document.getElementById('model-choice').value;
-
-      if (!text) {
-        alert("Please enter ticket text.");
-        return;
-      }
-
-      const payload = {
-        ticket_text: text,
-        model_choice: model
-      };
-
-      const resultDiv = document.getElementById('result');
-      resultDiv.style.display = 'block';
-      resultDiv.textContent = 'Loading...';
-
-      try {
-        const response = await fetch('https://triager-backend.onrender.com/predict', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-
-        if (!response.ok) {
-          throw new Error('API request failed');
-        }
-
-        const data = await response.json();
-        resultDiv.innerHTML = `
-          <strong>Prediction:</strong><br>
-          Category: ${data.category} (confidence: ${(data.category_confidence * 100).toFixed(1)}%)<br>
-          Priority: ${data.priority} (confidence: ${(data.priority_confidence * 100).toFixed(1)}%)<br>
-          Model Used: ${data.model_used}
-        `;
-      } catch (err) {
-        console.error(err);
-        resultDiv.textContent = 'An error occurred. Please try again later.';
-      }
-    }
-  </script>
+  <!-- JS should load at end for safety -->
+  <script src="triager.js"></script>
 </body>
 </html>
