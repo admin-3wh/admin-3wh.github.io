@@ -1,39 +1,51 @@
-// projects/shapesound/shapesound.js
+// shapesound.js
 
-document.getElementById("run").addEventListener("click", () => {
-  const script = document.getElementById("code").value;
-  const ctx = document.getElementById("canvas").getContext("2d");
+document.addEventListener("DOMContentLoaded", () => {
+  const runButton = document.getElementById("run");
+  const canvas = document.getElementById("canvas");
+  const ctx = canvas.getContext("2d");
 
-  // Clear canvas
-  ctx.clearRect(0, 0, 800, 600);
+  runButton.addEventListener("click", () => {
+    const script = document.getElementById("code").value;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  // Very basic demo: look for `circle x y r color #hex`
-  const lines = script.split("\n");
-  for (let line of lines) {
-    const parts = line.trim().split(" ");
-    if (parts[0] === "circle") {
-      const [_, x, y, r, , color] = parts;
-      ctx.beginPath();
-      ctx.arc(Number(x), Number(y), Number(r), 0, 2 * Math.PI);
-      ctx.fillStyle = color;
-      ctx.fill();
+    const lines = script.split("\n");
+
+    for (const line of lines) {
+      const parts = line.trim().split(/\s+/); // split by any space
+      if (parts[0] === "circle" && parts.length >= 6) {
+        const x = parseFloat(parts[1]);
+        const y = parseFloat(parts[2]);
+        const r = parseFloat(parts[3]);
+        const colorIndex = parts.indexOf("color");
+        const color = colorIndex !== -1 ? parts[colorIndex + 1] : "#FFFFFF";
+
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, 2 * Math.PI);
+        ctx.fillStyle = color;
+        ctx.fill();
+      }
+
+      if (parts[0] === "sound" && parts.length >= 3) {
+        const freq = parseFloat(parts[1]);
+        const duration = parseFloat(parts[2]);
+        playTone(freq, duration);
+      }
     }
-    if (parts[0] === "sound") {
-      const [, freq, duration] = parts;
-      playTone(Number(freq), Number(duration));
-    }
+  });
+
+  function playTone(freq, duration) {
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const oscillator = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+
+    oscillator.type = "sine";
+    oscillator.frequency.value = freq;
+
+    oscillator.connect(gain);
+    gain.connect(audioCtx.destination);
+
+    oscillator.start();
+    oscillator.stop(audioCtx.currentTime + duration);
   }
 });
-
-// Play tone using Web Audio API
-function playTone(freq = 440, duration = 1) {
-  const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-  const oscillator = audioCtx.createOscillator();
-  const gain = audioCtx.createGain();
-  oscillator.type = "sine";
-  oscillator.frequency.value = freq;
-  oscillator.connect(gain);
-  gain.connect(audioCtx.destination);
-  oscillator.start();
-  oscillator.stop(audioCtx.currentTime + duration);
-}
