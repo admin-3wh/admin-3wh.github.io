@@ -20,6 +20,7 @@
       text-align: center;
       cursor: pointer;
       transition: transform 0.3s ease, box-shadow 0.3s ease;
+      text-decoration: none; /* Prevent underline on hover */
     }
 
     .project-item img {
@@ -37,7 +38,6 @@
       margin-top: 0.5rem;
       font-size: 1rem;
       color: inherit;
-      text-decoration: none;
     }
   </style>
 </head>
@@ -60,6 +60,7 @@
       </div>
     </nav>
   </header>
+
   <main>
     <section class="intro">
       <h1>Projects</h1>
@@ -69,10 +70,16 @@
     <section class="projects-grid">
       <a class="project-item" href="/projects/triager/">
         <img src="/projects/triager/img/triager-logo.png" alt="Triager+ logo">
+        <div class="project-title">Triager+</div>
       </a>
-      <!-- Add more project items here if needed -->
+
+      <a class="project-item" href="/projects/shapesound/">
+        <img src="/projects/shapesound/img/shapesound-logo.png" alt="ShapeSound logo">
+        <div class="project-title">ShapeSound</div>
+      </a>
     </section>
   </main>
+
   <footer>
     © 2025 3wh.dev. All rights reserved.
   </footer>
