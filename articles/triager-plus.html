@@ -28,28 +28,27 @@
       font-size: 0.9rem;
       margin-bottom: 2rem;
     }
-    .back-link {
-      display: inline-block;
-      margin-bottom: 1.5rem;
-      text-decoration: none;
-      color: #000;
-    }
     a {
       color: #0077cc;
+    }
+    .back-link {
+      display: inline-block;
+      margin-bottom: 1rem;
+      text-decoration: none;
+      color: #333;
     }
   </style>
 </head>
 <body>
   <main>
-    <a href="/articles/" class="back-link">← Back to Articles</a>
-
+    <a class="back-link" href="/articles/">← Back to Articles</a>
     <h1>Triager+: From Concept to Execution</h1>
     <p class="meta">Written by 3wh Admin · Published on <span id="pub-date">Jul 26, 2025</span></p>
 
     <p><em>Triager+</em> began as a challenge — to combine machine learning with a usable, focused web interface for classifying help desk tickets. But it evolved into something more: an exercise in product minimalism, memory-aware architecture, and end-to-end delivery from backend to UI. This is the story of its construction.</p>
 
     <h2>What Came Before?</h2>
-    <p>Before Triager+, simpler classifiers were tested using plain Python scripts and manual CSV input/output. The very first iterations used keyword-matching logic and basic logistic regression, which proved brittle and inadequate for real-world variance. These early experiments set the stage for exploring true NLP pipelines using TF-IDF and transformer-based architectures.</p>
+    <p>Before Triager+, there were experiments with CSVs, local Jupyter notebooks, and isolated model training sessions. Ticket classification lived as a script, not a product. No UI, no backend — just direct calls to predict functions for hardcoded strings. The challenge wasn’t just in modeling — it was in integrating those models into a user-facing experience.</p>
 
     <h2>What Is Triager+?</h2>
     <p>Triager+ is a web-based tool that classifies help desk ticket descriptions into categories and priorities. At its core, it’s a text classifier powered by both a lightweight Naive Bayes model and an optional (currently disabled) DistilBERT deep learning model. The goal was to make something useful, lightweight, and easily hostable — a proof of concept for real-world applications, built cleanly and without fluff.</p>
@@ -58,7 +57,7 @@
     <p>This project emerged from a desire to make something practical, fast, and visually simple. Unlike sprawling web apps, Triager+ was an exercise in clarity: take in a sentence or two, and give the user a high-confidence classification. But it was also strategic — a demonstration of the ability to integrate modern AI with scalable backend/frontend deployment. In a world overrun by toy projects and API demos, Triager+ aimed to deliver a product with edges — lightweight, yet real.</p>
 
     <h2>Why These Models?</h2>
-    <p>Naive Bayes was chosen as the default for its low memory footprint, high speed, and solid performance on TF-IDF-transformed data. It handled categorical separation well with minimal tuning. DistilBERT, while much more powerful due to its contextual understanding of text, required substantially more memory and had slower inference — making it less ideal for free-tier deployment. The architecture supports both, showcasing the ability to offer layered model options.</p>
+    <p>Naive Bayes was chosen for its speed, simplicity, and low memory requirements. It's well-suited for baseline classification, especially when combined with TF-IDF vectorization. DistilBERT was added as an advanced option — a distilled transformer model capable of deeper semantic understanding. While more powerful, DistilBERT's memory usage was too high for the free-tier deployment, leading to its graceful exclusion with a fallback to Naive Bayes.</p>
 
     <h2>Architecture Overview</h2>
     <p>The architecture breaks down into three primary components:</p>
@@ -93,7 +92,7 @@
     <p>Triager+ now exists as a finished demonstration. The next project — <strong>ShapeSound</strong> — will explore new dimensions: visual-audio translation, generative design, and user-guided creative tools. But Triager+ was the prototype of purpose. Fast, smart, and focused.</p>
 
     <h2>Download PDF</h2>
-    <p>(Coming Soon — a downloadable PDF version of this article)</p>
+    <p><a href="/articles/triager-plus.pdf" download>Click here to download this article as a PDF</a></p>
   </main>
 </body>
 </html>
