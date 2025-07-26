@@ -10,10 +10,43 @@
 <body>
   <div id="app">
     <h1>ShapeSound</h1>
+
     <textarea id="code" placeholder="Write your ShapeSound script here..."></textarea>
-    <button id="run">Run</button>
+
+    <div id="controls">
+      <button id="run">Run</button>
+      <button id="help-toggle">❓ Help</button>
+      <select id="example-picker">
+        <option value="">Load Example</option>
+        <option value="example1">Rainbow Circle</option>
+        <option value="example2">Line Dance</option>
+        <option value="example3">Tones & Shapes</option>
+      </select>
+      <button id="export-png">Export PNG</button>
+      <button id="copy-code">Copy Code</button>
+    </div>
+
     <canvas id="canvas" width="800" height="600"></canvas>
-    <audio id="audio" controls></audio>
+
+    <div id="help-panel" style="display: none;">
+      <h3>ShapeSound Help</h3>
+      <pre>
+canvas 800 600
+background #000000
+
+circle 400 300 50 color #FF0000
+rect 100 100 100 100 color #00FF00
+line 100 100 300 300 width 5 color #FFFFFF
+
+sound 440 1
+play C4
+sequence {
+  C4 D4 E4 F4
+}
+
+animate circle 100 100 40 -> 400 400 60 duration 3s
+      </pre>
+    </div>
   </div>
   <script src="shapesound.js"></script>
 </body>
