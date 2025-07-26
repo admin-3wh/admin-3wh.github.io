@@ -1,11 +1,38 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Articles</title>
-  <link rel="stylesheet" href="/style/main.css">
-  <link rel="icon" href="/favicon.ico" type="image/x-icon">
+  <link rel="stylesheet" href="/style/main.css" />
+  <link rel="icon" href="/favicon.ico" type="image/x-icon" />
+  <style>
+    .article-list ul {
+      list-style-type: none;
+      padding: 0;
+      margin-top: 1.5rem;
+    }
+
+    .article-list li {
+      margin-bottom: 1rem;
+    }
+
+    .article-link {
+      display: block;
+      font-size: 1.2rem;
+      color: #222;
+      padding: 0.5rem 0.75rem;
+      border-radius: 6px;
+      background-color: #f8f8f8;
+      transition: background-color 0.2s ease, transform 0.1s ease;
+      text-decoration: none;
+    }
+
+    .article-link:hover {
+      background-color: #e2e2e2;
+      transform: translateX(4px);
+    }
+  </style>
 </head>
 <body>
   <header>
@@ -23,17 +50,31 @@
         <span></span>
         <span></span>
         <span></span>
+      </div>
     </nav>
   </header>
+
   <main>
     <section class="intro">
       <h1>Articles</h1>
       <p>A collection of writings, thoughts, and insights hosted here.</p>
     </section>
+
+    <section class="article-list">
+      <ul>
+        <li>
+          <a href="/articles/triager-plus.html" class="article-link">
+            Triager+: From Concept to Execution
+          </a>
+        </li>
+      </ul>
+    </section>
   </main>
+
   <footer>
     © 2025 3wh.dev. All rights reserved.
   </footer>
+
   <script src="/script.js"></script>
 </body>
 </html>
