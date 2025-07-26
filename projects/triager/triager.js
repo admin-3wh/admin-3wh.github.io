@@ -5,6 +5,7 @@ document.addEventListener('DOMContentLoaded', () => {
   predictBtn.addEventListener('click', async () => {
     const ticketText = document.getElementById('ticket-text').value;
     const modelChoice = document.getElementById('model-select').value;
+    console.log("Sending model_choice:", modelChoice);
 
     output.style.display = 'block';
     output.innerHTML = 'Loading...';
