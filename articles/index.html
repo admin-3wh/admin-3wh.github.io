@@ -7,6 +7,12 @@
   <link rel="stylesheet" href="/style/main.css" />
   <link rel="icon" href="/favicon.ico" type="image/x-icon" />
   <style>
+    .article-list {
+      max-width: 800px;
+      margin: 2rem auto;
+      padding: 0 1rem;
+    }
+
     .article-list ul {
       list-style-type: none;
       padding: 0;
@@ -14,23 +20,44 @@
     }
 
     .article-list li {
-      margin-bottom: 1rem;
+      margin-bottom: 2rem;
     }
 
     .article-link {
       display: block;
-      font-size: 1.2rem;
-      color: #222;
+      font-size: 1.3rem;
+      font-weight: 600;
+      color: var(--text-color, #222);
       padding: 0.5rem 0.75rem;
       border-radius: 6px;
-      background-color: #f8f8f8;
+      background-color: var(--card-bg, #f8f8f8);
       transition: background-color 0.2s ease, transform 0.1s ease;
       text-decoration: none;
     }
 
     .article-link:hover {
-      background-color: #e2e2e2;
+      background-color: var(--hover-bg, #e2e2e2);
       transform: translateX(4px);
+    }
+
+    .meta {
+      font-size: 0.9rem;
+      color: #666;
+      margin-left: 0.75rem;
+      margin-top: 0.25rem;
+    }
+
+    html.dark .article-link {
+      background-color: #1e1e1e;
+      color: #f0f0f0;
+    }
+
+    html.dark .article-link:hover {
+      background-color: #2c2c2c;
+    }
+
+    html.dark .meta {
+      color: #aaa;
     }
   </style>
 </head>
@@ -66,7 +93,9 @@
           <a href="/articles/triager-plus.html" class="article-link">
             Triager+: From Concept to Execution
           </a>
+          <div class="meta">Written by 3wh Admin · Jul 26, 2025</div>
         </li>
+        <!-- Future articles can be added below -->
       </ul>
     </section>
   </main>
