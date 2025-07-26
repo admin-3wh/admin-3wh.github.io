@@ -1,6 +1,5 @@
-// projects/shapesound/main.js
+// projects/shapesound/shapesound.js
 
-// 🎶 Note frequency map for play and sequence blocks
 const noteMap = {
   C4: 261.63, D4: 293.66, E4: 329.63, F4: 349.23,
   G4: 392.00, A4: 440.00, B4: 493.88,
@@ -8,20 +7,16 @@ const noteMap = {
   F5: 698.46, G5: 783.99, A5: 880.00, B5: 987.77
 };
 
-// 🎬 Animation state
 let animations = [];
 
 function playTone(freq, duration = 1) {
   const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   const osc = audioCtx.createOscillator();
   const gain = audioCtx.createGain();
-
   osc.type = "sine";
   osc.frequency.value = freq;
-
   osc.connect(gain);
   gain.connect(audioCtx.destination);
-
   osc.start();
   osc.stop(audioCtx.currentTime + duration);
 }
@@ -137,15 +132,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function step(timestamp) {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-
     for (let anim of animations) {
       if (!anim.startTime) anim.startTime = timestamp;
       const t = Math.min((timestamp - anim.startTime) / anim.duration, 1);
-
       const x = anim.x1 + (anim.x2 - anim.x1) * t;
       const y = anim.y1 + (anim.y2 - anim.y1) * t;
       const r = anim.r1 + (anim.r2 - anim.r1) * t;
-
       ctx.beginPath();
       if (anim.shape === "circle") {
         ctx.arc(x, y, r, 0, 2 * Math.PI);
@@ -153,9 +145,55 @@ document.addEventListener("DOMContentLoaded", () => {
         ctx.fill();
       }
     }
-
     if (animations.some(a => (timestamp - a.startTime) < a.duration)) {
       requestAnimationFrame(step);
     }
   }
+
+  // 📋 EXTRAS
+
+  document.getElementById("help-toggle").addEventListener("click", () => {
+    const panel = document.getElementById("help-panel");
+    panel.style.display = panel.style.display === "none" ? "block" : "none";
+  });
+
+  document.getElementById("example-picker").addEventListener("change", (e) => {
+    const code = document.getElementById("code");
+    const val = e.target.value;
+    const examples = {
+      example1: `canvas 800 600
+background #000
+circle 200 300 60 color #FF0000
+circle 400 300 60 color #00FF00
+circle 600 300 60 color #0000FF`,
+      example2: `canvas 800 600
+background #111
+line 100 100 700 100 width 5 color #FF00FF
+line 100 200 700 200 width 5 color #00FFFF
+line 100 300 700 300 width 5 color #FFFF00`,
+      example3: `canvas 800 600
+background #000
+circle 400 300 80 color #8888FF
+play C4
+sequence {
+  C4 D4 E4 F4 G4
+}`
+    };
+    code.value = examples[val] || "";
+  });
+
+  document.getElementById("export-png").addEventListener("click", () => {
+    const canvas = document.getElementById("canvas");
+    const link = document.createElement("a");
+    link.download = "shapesound.png";
+    link.href = canvas.toDataURL("image/png");
+    link.click();
+  });
+
+  document.getElementById("copy-code").addEventListener("click", () => {
+    const code = document.getElementById("code").value;
+    navigator.clipboard.writeText(code).then(() => {
+      alert("Code copied to clipboard!");
+    });
+  });
 });
