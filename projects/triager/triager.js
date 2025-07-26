@@ -8,6 +8,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const ticketText = textarea.value;
     const modelChoice = document.getElementById('model-select').value;
     console.log("Sending model_choice:", modelChoice);
+    gtag('event', 'predict_click', {
+      'event_category': 'triager',
+      'event_label': modelChoice,
+    });
 
     output.style.display = 'block';
     output.innerHTML = 'Loading...';
