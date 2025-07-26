@@ -32,3 +32,22 @@ canvas {
   margin-top: 1rem;
   background: #000;
 }
+
+#controls {
+  margin: 1rem 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: center;
+}
+
+#help-panel {
+  background: #222;
+  padding: 1rem;
+  border: 1px solid #444;
+  margin-top: 1rem;
+  max-width: 800px;
+  white-space: pre-wrap;
+  font-size: 0.9rem;
+  color: #ddd;
+}
