@@ -6,6 +6,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const ticketText = document.getElementById('ticket-text').value;
     const modelChoice = document.getElementById('model-select').value;
 
+    output.style.display = 'block';
     output.innerHTML = 'Loading...';
 
     try {
