@@ -1,9 +1,11 @@
 document.addEventListener('DOMContentLoaded', () => {
   const predictBtn = document.getElementById('predict-btn');
+  const clearBtn = document.getElementById('clear-btn');
   const output = document.getElementById('output');
+  const textarea = document.getElementById('ticket-text');
 
   predictBtn.addEventListener('click', async () => {
-    const ticketText = document.getElementById('ticket-text').value;
+    const ticketText = textarea.value;
     const modelChoice = document.getElementById('model-select').value;
     console.log("Sending model_choice:", modelChoice);
 
@@ -19,17 +21,27 @@ document.addEventListener('DOMContentLoaded', () => {
 
       if (!response.ok) {
         output.innerHTML = 'Error from backend';
+        clearBtn.style.display = 'inline-block';
         return;
       }
 
       const result = await response.json();
       output.innerHTML = `
-        <strong>Category:</strong> ${result.category} (${result.category_confidence * 100}% confidence)<br>
-        <strong>Priority:</strong> ${result.priority} (${result.priority_confidence * 100}% confidence)<br>
+        <strong>Category:</strong> ${result.category} (${(result.category_confidence * 100).toFixed(2)}% confidence)<br>
+        <strong>Priority:</strong> ${result.priority} (${(result.priority_confidence * 100).toFixed(2)}% confidence)<br>
         <em>Model used:</em> ${result.model_used}
       `;
+      clearBtn.style.display = 'inline-block';
     } catch (error) {
       output.innerHTML = 'Failed to connect to backend.';
+      clearBtn.style.display = 'inline-block';
     }
+  });
+
+  clearBtn.addEventListener('click', () => {
+    textarea.value = '';
+    output.innerHTML = '';
+    output.style.display = 'none';
+    clearBtn.style.display = 'none';
   });
 });
