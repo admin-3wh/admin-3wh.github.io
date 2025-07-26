@@ -19,13 +19,14 @@ document.addEventListener('DOMContentLoaded', () => {
         body: JSON.stringify({ ticket_text: ticketText, model_choice: modelChoice })
       });
 
+      const result = await response.json();
+
       if (!response.ok) {
-        output.innerHTML = 'Error from backend';
+        output.innerHTML = result.error || 'Error from backend';
         clearBtn.style.display = 'inline-block';
         return;
       }
 
-      const result = await response.json();
       output.innerHTML = `
         <strong>Category:</strong> ${result.category} (${(result.category_confidence * 100).toFixed(2)}% confidence)<br>
         <strong>Priority:</strong> ${result.priority} (${(result.priority_confidence * 100).toFixed(2)}% confidence)<br>
