@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Triager+: From Concept to Execution</title>
+  <link rel="stylesheet" href="/style.css"> <!-- Link to your site-wide CSS -->
+  <style>
+    main {
+      max-width: 800px;
+      margin: 2rem auto;
+      padding: 1rem;
+      background-color: var(--background, #fff);
+      border-radius: 8px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    }
+    h1, h2, h3 {
+      color: #111;
+      margin-top: 2rem;
+    }
+    p {
+      margin-top: 1rem;
+      line-height: 1.7;
+    }
+    .meta {
+      font-style: italic;
+      color: #666;
+      font-size: 0.9rem;
+      margin-bottom: 2rem;
+    }
+    a {
+      color: #0077cc;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Triager+: From Concept to Execution</h1>
+    <p class="meta">Written by 3wh Admin · Published on <span id="pub-date">Jul 26, 2025</span></p>
+
+    <p><em>Triager+</em> began as a challenge — to combine machine learning with a usable, focused web interface for classifying help desk tickets. But it evolved into something more: an exercise in product minimalism, memory-aware architecture, and end-to-end delivery from backend to UI. This is the story of its construction.</p>
+
+    <h2>What Is Triager+?</h2>
+    <p>Triager+ is a browser-based tool that accepts unstructured help desk ticket descriptions and classifies them into predefined <strong>categories</strong> and <strong>priorities</strong>. It supports two models: a lightweight Naive Bayes and a (currently disabled) DistilBERT deep learning alternative.</p>
+
+    <h2>Why Build It?</h2>
+    <p>The goal was to create something useful but deployable, intelligent but minimal. No extra packages, no large dependencies if avoidable. It was also a technical portfolio project — to show you can build something <strong>real</strong>, not just theoretical.</p>
+
+    <h2>Architecture Overview</h2>
+    <p>The system is composed of:</p>
+    <ul>
+      <li>A FastAPI backend that handles requests, preprocessing, and model inference</li>
+      <li>scikit-learn for training and saving the Naive Bayes models</li>
+      <li>A client-side interface using HTML/CSS/JavaScript</li>
+      <li>Hosted via Render (backend) and GitHub Pages (frontend)</li>
+    </ul>
+
+    <h2>Training the Models</h2>
+    <p>The Naive Bayes model was trained on labeled ticket data using TF-IDF vectorization. It predicts both category and priority. DistilBERT was finetuned but disabled due to RAM constraints on free Render plans.</p>
+
+    <h2>Handling Constraints</h2>
+    <p>The project faced real-world constraints:</p>
+    <ul>
+      <li><strong>CORS errors</strong> requiring careful middleware setup</li>
+      <li><strong>Memory limits</strong> leading to the decision to gracefully disable the transformer model</li>
+      <li><strong>Latency optimization</strong> for fast response on low-cost infrastructure</li>
+    </ul>
+
+    <h2>Designing the UI</h2>
+    <p>UI design was kept intentionally minimal. Buttons, confidence percentages, a clear reset option, and basic mobile responsiveness were all tuned by hand. An optional analytics system (Google Analytics) was added with future usage tracking in mind.</p>
+
+    <h2>Lessons Learned</h2>
+    <ul>
+      <li>Small projects still require deployment discipline</li>
+      <li>Frontend error handling needs to anticipate every backend fail mode</li>
+      <li>Tools that say little but do something useful will always have value</li>
+    </ul>
+
+    <h2>What’s Next?</h2>
+    <p>Triager+ is complete — but the methodology behind it (quick experiments, direct feedback, real-world context) will drive future work. A second project is already in motion: <strong>ShapeSound</strong>.</p>
+
+    <h2>Download PDF</h2>
+    <p>(Coming Soon — auto-generated from this article)</p>
+  </main>
+</bo
