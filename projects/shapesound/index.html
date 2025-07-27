@@ -11,20 +11,33 @@
   <div id="app">
     <h1>ShapeSound</h1>
 
+    <div id="prompt-box">
+      <input type="text" id="natural-prompt" placeholder="Describe your scene (e.g., '3 red circles')" />
+      <button id="convert-prompt">Generate</button>
+    </div>
+
     <textarea id="code" placeholder="Write your ShapeSound script here..."></textarea>
 
     <div id="controls">
       <button id="run">Run</button>
       <button id="help-toggle">❓ Help</button>
+
       <select id="example-picker">
         <option value="">Load Example</option>
         <option value="example1">Rainbow Circle</option>
         <option value="example2">Line Dance</option>
         <option value="example3">Tones & Shapes</option>
       </select>
+
+      <select id="saved-scenes"></select>
+      <button id="save-scene">Save</button>
+      <button id="delete-scene">Delete</button>
+
       <button id="export-png">Export PNG</button>
       <button id="copy-code">Copy Code</button>
     </div>
+
+    <div id="error-box"></div>
 
     <canvas id="canvas" width="800" height="600"></canvas>
 
@@ -48,6 +61,7 @@ animate circle 100 100 40 -> 400 400 60 duration 3s
       </pre>
     </div>
   </div>
+
   <script src="shapesound.js"></script>
 </body>
 </html>
