@@ -15,6 +15,7 @@ body {
   max-width: 900px;
 }
 
+/* Prompt Box */
 #prompt-box {
   display: flex;
   gap: 0.5rem;
@@ -37,12 +38,16 @@ body {
   border: none;
   color: #fff;
   cursor: pointer;
+  transition: background 0.2s ease;
 }
 
-#prompt-box button:hover {
+#prompt-box button:hover,
+#controls button:hover,
+#timeline-controls button:hover {
   background: #666;
 }
 
+/* Code Editor */
 textarea {
   width: 100%;
   height: 200px;
@@ -55,6 +60,7 @@ textarea {
   resize: vertical;
 }
 
+/* Canvas */
 canvas {
   border: 1px solid #444;
   margin-top: 1rem;
@@ -63,6 +69,7 @@ canvas {
   max-width: 100%;
 }
 
+/* Main Controls */
 #controls {
   margin: 1rem 0;
   display: flex;
@@ -71,6 +78,50 @@ canvas {
   justify-content: center;
 }
 
+#controls button,
+#timeline-controls button,
+.button-like {
+  padding: 0.5rem 1rem;
+  background: #444;
+  border: none;
+  color: #fff;
+  cursor: pointer;
+  font-family: monospace;
+  transition: background 0.2s ease, transform 0.1s ease;
+}
+
+#controls button:active,
+#timeline-controls button:active,
+.button-like:active {
+  transform: scale(0.97);
+}
+
+/* File input styled as button */
+#load-json {
+  display: none;
+}
+.button-like {
+  display: inline-block;
+  text-align: center;
+}
+
+/* Timeline Controls */
+#timeline-controls {
+  margin: 1rem 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  justify-content: center;
+}
+
+#timeline-scrubber {
+  width: 200px;
+  accent-color: #00ffaa;
+  cursor: pointer;
+}
+
+/* Help Panel */
 #help-panel {
   background: #222;
   padding: 1rem;
@@ -80,8 +131,10 @@ canvas {
   white-space: pre-wrap;
   font-size: 0.9rem;
   color: #ddd;
+  border-radius: 4px;
 }
 
+/* Error Box */
 #error-box {
   margin-top: 0.5rem;
   background: #330000;
@@ -90,15 +143,24 @@ canvas {
   display: none;
   font-size: 0.9rem;
   white-space: pre-wrap;
+  border-radius: 4px;
 }
 
+/* Mobile Responsiveness */
 @media (max-width: 600px) {
-  #controls, #prompt-box {
+  #controls, #prompt-box, #timeline-controls {
     flex-direction: column;
     align-items: stretch;
   }
 
-  #controls button, #prompt-box button {
+  #controls button, 
+  #prompt-box button, 
+  #timeline-controls button,
+  .button-like {
+    width: 100%;
+  }
+
+  #timeline-scrubber {
     width: 100%;
   }
 
