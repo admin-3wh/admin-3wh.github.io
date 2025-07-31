@@ -7,9 +7,12 @@
   <title>ShapeSound</title>
   <link rel="stylesheet" href="style.css" />
 </head>
-<body>
+<body class="dark">
   <div id="app">
-    <h1>ShapeSound</h1>
+    <header id="top-bar">
+      <h1>ShapeSound</h1>
+      <button id="theme-toggle">🌙 Dark</button>
+    </header>
 
     <!-- Natural Prompt Box -->
     <div id="prompt-box">
@@ -81,5 +84,24 @@ delay 1000
   </div>
 
   <script src="shapesound.js"></script>
+  <script>
+    // Theme Toggle Script
+    const themeToggle = document.getElementById("theme-toggle");
+    const body = document.body;
+
+    // Load stored theme
+    if (localStorage.getItem("theme")) {
+      body.className = localStorage.getItem("theme");
+      themeToggle.textContent = body.classList.contains("dark") ? "🌙 Dark" : "☀️ Light";
+    }
+
+    themeToggle.addEventListener("click", () => {
+      body.classList.toggle("dark");
+      body.classList.toggle("light");
+      const theme = body.classList.contains("dark") ? "dark" : "light";
+      themeToggle.textContent = theme === "dark" ? "🌙 Dark" : "☀️ Light";
+      localStorage.setItem("theme", theme);
+    });
+  </script>
 </body>
 </html>
