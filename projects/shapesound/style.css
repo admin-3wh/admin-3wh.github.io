@@ -1,18 +1,83 @@
 /* projects/shapesound/style.css */
+
+/* Base styles (apply to both themes) */
 body {
   font-family: monospace;
-  background: #111;
-  color: #f0f0f0;
   display: flex;
   flex-direction: column;
   align-items: center;
   margin: 0;
   padding: 2rem;
+  transition: background 0.3s, color 0.3s;
 }
 
 #app {
   width: 90%;
   max-width: 900px;
+}
+
+/* Dark theme */
+body.dark {
+  background: #111;
+  color: #f0f0f0;
+}
+
+body.dark canvas {
+  background: #000;
+}
+
+body.dark #prompt-box input,
+body.dark textarea,
+body.dark #help-panel {
+  background: #222;
+  color: #f8f8f2;
+  border: 1px solid #333;
+}
+
+/* Light theme */
+body.light {
+  background: #f4f4f4;
+  color: #222;
+}
+
+body.light canvas {
+  background: #fff;
+}
+
+body.light #prompt-box input,
+body.light textarea,
+body.light #help-panel {
+  background: #fff;
+  color: #111;
+  border: 1px solid #ccc;
+}
+
+/* Top Bar */
+#top-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  margin-bottom: 1rem;
+}
+
+#theme-toggle {
+  padding: 0.5rem 1rem;
+  background: #444;
+  border: none;
+  color: #fff;
+  cursor: pointer;
+  font-family: monospace;
+  transition: background 0.2s ease;
+}
+
+body.light #theme-toggle {
+  background: #ddd;
+  color: #111;
+}
+
+#theme-toggle:hover {
+  background: #666;
 }
 
 /* Prompt Box */
@@ -26,9 +91,6 @@ body {
 #prompt-box input {
   flex: 1;
   padding: 0.5rem;
-  background: #222;
-  color: #fff;
-  border: 1px solid #333;
   font-family: monospace;
 }
 
@@ -41,30 +103,21 @@ body {
   transition: background 0.2s ease;
 }
 
-#prompt-box button:hover,
-#controls button:hover,
-#timeline-controls button:hover {
-  background: #666;
-}
-
 /* Code Editor */
 textarea {
   width: 100%;
   height: 200px;
   margin-bottom: 1rem;
-  background: #222;
-  color: #f8f8f2;
-  border: none;
   padding: 1rem;
   font-size: 1rem;
   resize: vertical;
+  font-family: monospace;
 }
 
 /* Canvas */
 canvas {
   border: 1px solid #444;
   margin-top: 1rem;
-  background: #000;
   width: 100%;
   max-width: 100%;
 }
@@ -88,6 +141,13 @@ canvas {
   cursor: pointer;
   font-family: monospace;
   transition: background 0.2s ease, transform 0.1s ease;
+}
+
+body.light #controls button,
+body.light #timeline-controls button,
+body.light .button-like {
+  background: #ddd;
+  color: #111;
 }
 
 #controls button:active,
@@ -123,14 +183,11 @@ canvas {
 
 /* Help Panel */
 #help-panel {
-  background: #222;
   padding: 1rem;
-  border: 1px solid #444;
   margin-top: 1rem;
   max-width: 800px;
   white-space: pre-wrap;
   font-size: 0.9rem;
-  color: #ddd;
   border-radius: 4px;
 }
 
@@ -148,7 +205,7 @@ canvas {
 
 /* Mobile Responsiveness */
 @media (max-width: 600px) {
-  #controls, #prompt-box, #timeline-controls {
+  #controls, #prompt-box, #timeline-controls, #top-bar {
     flex-direction: column;
     align-items: stretch;
   }
@@ -156,7 +213,8 @@ canvas {
   #controls button, 
   #prompt-box button, 
   #timeline-controls button,
-  .button-like {
+  .button-like,
+  #theme-toggle {
     width: 100%;
   }
 
