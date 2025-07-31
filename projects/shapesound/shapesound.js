@@ -53,6 +53,9 @@ document.addEventListener("DOMContentLoaded", () => {
   const ctx = canvas.getContext("2d");
   const codeArea = document.getElementById("code");
 
+  // ------------------
+  // Run ShapeSound Script
+  // ------------------
   document.getElementById("run").addEventListener("click", () => {
     const script = codeArea.value;
     const lines = script.split("\n").map(l => l.trim()).filter(l => l !== "");
@@ -167,6 +170,9 @@ document.addEventListener("DOMContentLoaded", () => {
     startScene(ctx);
   });
 
+  // ------------------
+  // Scene Loop
+  // ------------------
   function startScene(ctx) {
     animations = [];
     startTime = performance.now();
@@ -260,6 +266,10 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
+  // ------------------
+  // Extra Controls
+  // ------------------
+
   // Timeline controls
   document.getElementById("play-scene")?.addEventListener("click", () => {
     paused = false;
@@ -283,4 +293,110 @@ document.addEventListener("DOMContentLoaded", () => {
     pauseOffset = currentScene.duration * 1000 * percent;
     paused = true;
   });
+
+  // Natural Prompt → Script
+  document.getElementById("convert-prompt")?.addEventListener("click", () => {
+    const input = document.getElementById("natural-prompt").value.toLowerCase();
+    const output = [];
+    const colors = {
+      red: "#FF0000", green: "#00FF00", blue: "#0000FF",
+      yellow: "#FFFF00", purple: "#AA00FF", white: "#FFFFFF", black: "#000000"
+    };
+
+    const match = input.match(/(\d+)\s+(red|green|blue|yellow|purple|white|black)\s+(circle|square|rect|rectangle)/);
+    if (match) {
+      const count = parseInt(match[1]);
+      const color = colors[match[2]];
+      const shape = match[3];
+      const spacing = 800 / (count + 1);
+
+      for (let i = 0; i < count; i++) {
+        if (shape.startsWith("circle")) {
+          output.push(`circle ${spacing * (i + 1)} 300 40 color ${color}`);
+        } else {
+          output.push(`rect ${spacing * (i + 1) - 20} 280 40 40 color ${color}`);
+        }
+      }
+    } else {
+      output.push("// Unsupported prompt. Try '4 white squares'.");
+    }
+
+    codeArea.value = output.join("\n");
+  });
+
+  // Example Picker
+  document.getElementById("example-picker")?.addEventListener("change", (e) => {
+    const code = document.getElementById("code");
+    const val = e.target.value;
+    const examples = {
+      example1: `canvas 800 600
+background #000
+circle 200 300 60 color #FF0000
+circle 400 300 60 color #00FF00
+circle 600 300 60 color #0000FF`,
+
+      example2: `canvas 800 600
+background #111
+line 100 100 700 100 width 5 color #FF00FF
+line 100 200 700 200 width 5 color #00FFFF
+line 100 300 700 300 width 5 color #FFFF00`,
+
+      example3: `canvas 800 600
+background #000
+circle 400 300 80 color #8888FF
+play C4
+sequence {
+  C4 D4 E4 F4 G4
+}
+animate circle 400 300 80 -> 600 300 120 duration 4s fromColor #8888FF toColor #00FF88`
+    };
+    code.value = examples[val] || "";
+  });
+
+  // Help Toggle
+  document.getElementById("help-toggle")?.addEventListener("click", () => {
+    const panel = document.getElementById("help-panel");
+    panel.style.display = panel.style.display === "none" ? "block" : "none";
+  });
+
+  // Saved Scenes
+  function updateSavedScenes() {
+    const dropdown = document.getElementById("saved-scenes");
+    dropdown.innerHTML = "<option value=''>Select Saved Scene</option>";
+    Object.keys(localStorage).forEach(key => {
+      if (key.startsWith("ss-")) {
+        const name = key.slice(3);
+        const option = document.createElement("option");
+        option.value = name;
+        option.textContent = name;
+        dropdown.appendChild(option);
+      }
+    });
+  }
+
+  document.getElementById("save-scene")?.addEventListener("click", () => {
+    const name = prompt("Enter name for this scene:");
+    if (name) {
+      localStorage.setItem("ss-" + name, codeArea.value);
+      updateSavedScenes();
+    }
+  });
+
+  document.getElementById("delete-scene")?.addEventListener("click", () => {
+    const dropdown = document.getElementById("saved-scenes");
+    const name = dropdown.value;
+    if (name && confirm("Delete scene '" + name + "'?")) {
+      localStorage.removeItem("ss-" + name);
+      updateSavedScenes();
+    }
+  });
+
+  document.getElementById("saved-scenes")?.addEventListener("change", (e) => {
+    const name = e.target.value;
+    if (name) {
+      codeArea.value = localStorage.getItem("ss-" + name);
+    }
+  });
+
+  updateSavedScenes();
 });
