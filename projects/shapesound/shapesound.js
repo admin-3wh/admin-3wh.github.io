@@ -1,6 +1,7 @@
 // projects/shapesound/shapesound.js
 
 const noteMap = {
+  C3: 130.81, D3: 146.83, E3: 164.81, F3: 174.61, G3: 196.00, A3: 220.00, B3: 246.94,
   C4: 261.63, D4: 293.66, E4: 329.63, F4: 349.23,
   G4: 392.00, A4: 440.00, B4: 493.88,
   C5: 523.25, D5: 587.33, E5: 659.25,
@@ -9,6 +10,10 @@ const noteMap = {
 
 let animations = [];
 let timeline = [];
+let currentScene = { duration: 10 };
+let paused = false;
+let pauseOffset = 0;
+let startTime = null;
 
 function playTone(freq, duration = 1) {
   const ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -32,10 +37,20 @@ function playSequence(notes, delay = 0.6) {
   }
 }
 
+function interpolateColor(c1, c2, t) {
+  const hexToRgb = hex => {
+    const bigint = parseInt(hex.slice(1), 16);
+    return [(bigint >> 16) & 255, (bigint >> 8) & 255, bigint & 255];
+  };
+  const rgbToHex = rgb => `#${rgb.map(x => x.toString(16).padStart(2, '0')).join('')}`;
+  const rgb1 = hexToRgb(c1), rgb2 = hexToRgb(c2);
+  const mix = rgb1.map((v, i) => Math.round(v + (rgb2[i] - v) * t));
+  return rgbToHex(mix);
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   const canvas = document.getElementById("canvas");
   const ctx = canvas.getContext("2d");
-
   const codeArea = document.getElementById("code");
 
   document.getElementById("run").addEventListener("click", () => {
@@ -131,8 +146,12 @@ document.addEventListener("DOMContentLoaded", () => {
             const from = parts.slice(2, 5).map(Number);
             const to = parts.slice(6, 9).map(Number);
             const duration = parseFloat(parts[parts.indexOf("duration") + 1]) * 1000;
-            timeline.push({ type: "animate", shape, from, to, duration, time: currentTime });
+            const fromColor = parts.includes("fromColor") ? parts[parts.indexOf("fromColor") + 1] : null;
+            const toColor = parts.includes("toColor") ? parts[parts.indexOf("toColor") + 1] : null;
+
+            timeline.push({ type: "animate", shape, from, to, duration, fromColor, toColor, time: currentTime });
             currentTime += duration;
+            currentScene.duration = Math.max(currentScene.duration || 0, currentTime / 1000);
             break;
           }
 
@@ -145,93 +164,92 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     showError("");
-    runTimeline(ctx);
+    startScene(ctx);
   });
 
-  function runTimeline(ctx) {
-    let startTime = performance.now();
-    let stepIndex = 0;
+  function startScene(ctx) {
+    animations = [];
+    startTime = performance.now();
+    pauseOffset = 0;
+    paused = false;
+    requestAnimationFrame(loop);
+  }
 
-    function loop(now) {
-      const elapsed = now - startTime;
+  function loop(now) {
+    if (paused) return;
+    const elapsed = now - startTime;
 
-      while (stepIndex < timeline.length && elapsed >= timeline[stepIndex].time) {
-        const item = timeline[stepIndex++];
-        switch (item.type) {
-          case "background":
-            ctx.fillStyle = item.color;
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            break;
-          case "draw":
-            ctx.beginPath();
-            ctx.fillStyle = item.color || "#FFF";
-            if (item.shape === "circle") {
-              ctx.arc(item.x, item.y, item.r, 0, 2 * Math.PI);
-              ctx.fill();
-            } else if (item.shape === "rect") {
-              ctx.fillRect(item.x, item.y, item.w, item.h);
-            } else if (item.shape === "line") {
-              ctx.strokeStyle = item.color;
-              ctx.lineWidth = item.width;
-              ctx.moveTo(item.x1, item.y1);
-              ctx.lineTo(item.x2, item.y2);
-              ctx.stroke();
-            }
-            break;
-          case "sound":
-            playTone(item.freq, item.dur);
-            break;
-          case "play":
-            playTone(noteMap[item.note], 1);
-            break;
-          case "sequence":
-            playSequence(item.notes);
-            break;
-          case "animate": {
-            const a = item;
-            const anim = {
-              shape: a.shape,
-              from: a.from,
-              to: a.to,
-              duration: a.duration,
-              startTime: now,
-              time: a.time
-            };
-            animations.push(anim);
-            break;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    while (timeline.length && elapsed >= timeline[0].time) {
+      const item = timeline.shift();
+      switch (item.type) {
+        case "background":
+          ctx.fillStyle = item.color;
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          break;
+        case "draw":
+          ctx.beginPath();
+          ctx.fillStyle = item.color || "#FFF";
+          if (item.shape === "circle") {
+            ctx.arc(item.x, item.y, item.r, 0, 2 * Math.PI);
+            ctx.fill();
+          } else if (item.shape === "rect") {
+            ctx.fillRect(item.x, item.y, item.w, item.h);
+          } else if (item.shape === "line") {
+            ctx.strokeStyle = item.color;
+            ctx.lineWidth = item.width;
+            ctx.moveTo(item.x1, item.y1);
+            ctx.lineTo(item.x2, item.y2);
+            ctx.stroke();
           }
-        }
-      }
-
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      animations = animations.filter(anim => {
-        const t = Math.min((now - anim.startTime) / anim.duration, 1);
-        if (t >= 1) return false;
-
-        const [x1, y1, r1] = anim.from;
-        const [x2, y2, r2] = anim.to;
-        const x = x1 + (x2 - x1) * t;
-        const y = y1 + (y2 - y1) * t;
-        const r = r1 + (r2 - r1) * t;
-
-        ctx.beginPath();
-        if (anim.shape === "circle") {
-          ctx.arc(x, y, r, 0, 2 * Math.PI);
-          ctx.fillStyle = "#FF00FF";
-          ctx.fill();
-        } else if (anim.shape === "rect") {
-          ctx.fillStyle = "#00FFFF";
-          ctx.fillRect(x, y, r, r);
-        }
-        return true;
-      });
-
-      if (stepIndex < timeline.length || animations.length > 0) {
-        requestAnimationFrame(loop);
+          break;
+        case "sound":
+          playTone(item.freq, item.dur);
+          break;
+        case "play":
+          playTone(noteMap[item.note], 1);
+          break;
+        case "sequence":
+          playSequence(item.notes);
+          break;
+        case "animate":
+          animations.push({ ...item, start: now });
+          break;
       }
     }
 
-    requestAnimationFrame(loop);
+    animations = animations.filter(anim => {
+      const t = Math.min((now - anim.start) / anim.duration, 1);
+      const [x1, y1, r1] = anim.from;
+      const [x2, y2, r2] = anim.to;
+      const x = x1 + (x2 - x1) * t;
+      const y = y1 + (y2 - y1) * t;
+      const r = r1 + (r2 - r1) * t;
+      const color = anim.fromColor && anim.toColor
+        ? interpolateColor(anim.fromColor, anim.toColor, t)
+        : "#FF00FF";
+
+      ctx.beginPath();
+      if (anim.shape === "circle") {
+        ctx.arc(x, y, r, 0, 2 * Math.PI);
+        ctx.fillStyle = color;
+        ctx.fill();
+      } else if (anim.shape === "rect") {
+        ctx.fillStyle = color;
+        ctx.fillRect(x, y, r, r);
+      }
+      return t < 1;
+    });
+
+    const scrubber = document.getElementById("timeline-scrubber");
+    if (scrubber && currentScene.duration) {
+      scrubber.value = Math.min((elapsed / (currentScene.duration * 1000)) * 100, 100);
+    }
+
+    if (timeline.length > 0 || animations.length > 0) {
+      requestAnimationFrame(loop);
+    }
   }
 
   function showError(msg) {
@@ -242,43 +260,27 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // Prompt-to-code
-  document.getElementById("convert-prompt")?.addEventListener("click", () => {
-    const input = document.getElementById("natural-prompt").value.toLowerCase();
-    const output = [];
-    const colors = { red: "#F00", green: "#0F0", blue: "#00F", yellow: "#FF0" };
-    const match = input.match(/(\d+)\s+(red|blue|green|yellow)\s+circle/);
-    if (match) {
-      const count = parseInt(match[1]);
-      const color = colors[match[2]];
-      const spacing = 800 / (count + 1);
-      for (let i = 0; i < count; i++) {
-        output.push(`circle ${spacing * (i + 1)} 300 50 color ${color}`);
-      }
-    } else {
-      output.push("// Sorry, unsupported prompt.");
-    }
-    codeArea.value = output.join("\n");
+  // Timeline controls
+  document.getElementById("play-scene")?.addEventListener("click", () => {
+    paused = false;
+    startTime = performance.now() - pauseOffset;
+    requestAnimationFrame(loop);
   });
 
-  // JSON Save/Load
-  document.getElementById("save-json")?.addEventListener("click", () => {
-    const data = { scene: codeArea.value };
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download = "scene.json";
-    link.click();
+  document.getElementById("pause-scene")?.addEventListener("click", () => {
+    paused = true;
   });
 
-  document.getElementById("load-json")?.addEventListener("change", (e) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const json = JSON.parse(reader.result);
-      if (json.scene) {
-        codeArea.value = json.scene;
-      }
-    };
-    reader.readAsText(e.target.files[0]);
+  document.getElementById("resume-scene")?.addEventListener("click", () => {
+    paused = false;
+    startTime = performance.now() - pauseOffset;
+    requestAnimationFrame(loop);
+  });
+
+  document.getElementById("timeline-scrubber")?.addEventListener("input", (e) => {
+    if (!currentScene.duration) return;
+    const percent = parseFloat(e.target.value) / 100;
+    pauseOffset = currentScene.duration * 1000 * percent;
+    paused = true;
   });
 });
