@@ -11,18 +11,22 @@
   <div id="app">
     <h1>ShapeSound</h1>
 
+    <!-- Natural Prompt Box -->
     <div id="prompt-box">
       <input type="text" id="natural-prompt" placeholder="Describe your scene (e.g., '3 red circles')" />
       <button id="convert-prompt">Generate</button>
     </div>
 
+    <!-- Script Editor -->
     <textarea id="code" placeholder="Write your ShapeSound script here..."></textarea>
 
+    <!-- Controls -->
     <div id="controls">
       <button id="run">Run</button>
       <button id="help-toggle">❓ Help</button>
-      <button id="export-json">Export JSON</button>
-      <button id="import-json">Import JSON</button>
+      <button id="save-json">Export JSON</button>
+      <input type="file" id="load-json" accept=".json" style="display:none;" />
+      <label for="load-json" class="button-like">Import JSON</label>
 
       <select id="example-picker">
         <option value="">Load Example</option>
@@ -39,10 +43,21 @@
       <button id="copy-code">Copy Code</button>
     </div>
 
-    <div id="error-box"></div>
+    <!-- Timeline Controls -->
+    <div id="timeline-controls">
+      <button id="play-scene">▶ Play</button>
+      <button id="pause-scene">⏸ Pause</button>
+      <button id="resume-scene">⏯ Resume</button>
+      <input type="range" id="timeline-scrubber" min="0" max="100" value="0" />
+    </div>
 
+    <!-- Error Box -->
+    <div id="error-box" style="display:none;"></div>
+
+    <!-- Canvas -->
     <canvas id="canvas" width="800" height="600"></canvas>
 
+    <!-- Help Panel -->
     <div id="help-panel" style="display: none;">
       <h3>ShapeSound Help</h3>
       <pre>
@@ -59,11 +74,12 @@ sequence {
   C4 D4 E4 F4
 }
 
-animate circle 100 100 40 -> 400 400 60 duration 3s
+animate circle 100 100 40 -> 400 400 60 duration 3s fromColor #FF0000 toColor #00FF00
+delay 1000
       </pre>
     </div>
   </div>
 
-  <script type="module" src="shapesound.js"></script>
+  <script src="shapesound.js"></script>
 </body>
 </html>
