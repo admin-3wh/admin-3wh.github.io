@@ -15,6 +15,9 @@ let paused = false;
 let pauseOffset = 0;
 let startTime = null;
 
+// 🎵 tempo support (Phase 1)
+let tempoBPM = 100;
+
 function playTone(freq, duration = 1) {
   const ctx = new (window.AudioContext || window.webkitAudioContext)();
   const osc = ctx.createOscillator();
@@ -27,12 +30,14 @@ function playTone(freq, duration = 1) {
   osc.stop(ctx.currentTime + duration);
 }
 
-function playSequence(notes, delay = 0.6) {
+function playSequence(notes) {
+  // derive beat length from tempo
+  const beat = 60 / tempoBPM; // seconds per beat
   let time = 0;
   for (let note of notes) {
     if (noteMap[note]) {
-      setTimeout(() => playTone(noteMap[note], delay * 0.9), time * 1000);
-      time += delay;
+      setTimeout(() => playTone(noteMap[note], Math.max(0.1, beat * 0.9)), time * 1000);
+      time += beat;
     }
   }
 }
@@ -46,6 +51,55 @@ function interpolateColor(c1, c2, t) {
   const rgb1 = hexToRgb(c1), rgb2 = hexToRgb(c2);
   const mix = rgb1.map((v, i) => Math.round(v + (rgb2[i] - v) * t));
   return rgbToHex(mix);
+}
+
+/* -------------------------------------------------------
+   🐢 Procedural Sprite: Turtle
+   Drawn from primitives; 'scale' controls overall size.
+------------------------------------------------------- */
+function drawTurtle(ctx, x, y, scale = 1, colorVariant = null) {
+  // choose a shell green variant if not provided (procedural variation hook)
+  const greens = ["#228B22", "#2E8B57", "#006400"];
+  const shellColor = colorVariant || greens[Math.floor(Math.random() * greens.length)];
+  const bellyColor = "#654321";
+  const eyeColor = "#000000";
+
+  const s = scale;
+  // shell
+  ctx.fillStyle = shellColor;
+  ctx.beginPath();
+  ctx.arc(x, y, 40 * s, 0, 2 * Math.PI);
+  ctx.fill();
+
+  // belly pattern
+  ctx.fillStyle = bellyColor;
+  ctx.beginPath();
+  ctx.ellipse(x, y + 5 * s, 28 * s, 20 * s, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // head
+  ctx.fillStyle = shellColor;
+  ctx.fillRect(x + 32 * s, y - 12 * s, 18 * s, 18 * s);
+
+  // eye
+  ctx.fillStyle = eyeColor;
+  ctx.beginPath();
+  ctx.arc(x + 46 * s, y - 4 * s, 2.5 * s, 0, 2 * Math.PI);
+  ctx.fill();
+
+  // legs
+  ctx.fillStyle = shellColor;
+  ctx.fillRect(x - 36 * s, y - 40 * s, 14 * s, 18 * s); // front-left
+  ctx.fillRect(x + 20 * s, y - 40 * s, 14 * s, 18 * s); // front-right
+  ctx.fillRect(x - 36 * s, y + 22 * s, 14 * s, 18 * s); // back-left
+  ctx.fillRect(x + 20 * s, y + 22 * s, 14 * s, 18 * s); // back-right
+
+  // tiny tail
+  ctx.beginPath();
+  ctx.moveTo(x - 42 * s, y + 6 * s);
+  ctx.lineTo(x - 56 * s, y);
+  ctx.lineTo(x - 42 * s, y - 6 * s);
+  ctx.fill();
 }
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -76,7 +130,8 @@ document.addEventListener("DOMContentLoaded", () => {
       }
       if (line === "}" && inSequence) {
         timeline.push({ type: "sequence", notes: sequenceNotes, time: currentTime });
-        currentTime += sequenceNotes.length * 600;
+        // duration of sequence depends on tempo (length = notes * beat)
+        currentTime += sequenceNotes.length * (60 / tempoBPM) * 1000;
         inSequence = false;
         continue;
       }
@@ -98,6 +153,14 @@ document.addEventListener("DOMContentLoaded", () => {
           case "background":
             timeline.push({ type: "background", color: parts[1], time: currentTime });
             break;
+
+          case "tempo": {
+            // tempo 60
+            const bpm = parseInt(parts[1]);
+            if (!Number.isFinite(bpm) || bpm <= 0) throw new Error("tempo must be a positive number");
+            tempoBPM = bpm;
+            break;
+          }
 
           case "circle": {
             const [x, y, r] = parts.slice(1, 4).map(Number);
@@ -121,38 +184,89 @@ document.addEventListener("DOMContentLoaded", () => {
             break;
           }
 
+          // 🐢 NEW: sprite turtle crawling (x=..., y=..., scale=..., color=#hex [optional])
+          case "sprite": {
+            const name = parts[1];           // turtle
+            const action = parts[2] || "";   // crawling (optional)
+            const kv = Object.fromEntries(
+              parts.slice(3).map(tok => tok.split("=")).filter(a => a.length === 2)
+            );
+            const x = Number(kv.x ?? 100);
+            const y = Number(kv.y ?? 500);
+            const scale = Number(kv.scale ?? 1);
+            const color = kv.color || null;
+
+            if (name !== "turtle") throw new Error(`unknown sprite: ${name}`);
+
+            timeline.push({
+              type: "draw",
+              shape: "sprite",
+              name, action, x, y, scale, color,
+              time: currentTime
+            });
+            break;
+          }
+
           case "sound": {
             const freq = parseFloat(parts[1]);
-            const dur = parseFloat(parts[2]);
-            timeline.push({ type: "sound", freq, dur, time: currentTime });
-            currentTime += dur * 1000;
+            const durSecs = parseFloat(parts[2]);
+            if (!Number.isFinite(freq) || !Number.isFinite(durSecs)) {
+              throw new Error("sound expects: sound FREQ SECONDS");
+            }
+            timeline.push({ type: "sound", freq, dur: durSecs, time: currentTime });
+            currentTime += durSecs * 1000;
             break;
           }
 
           case "play": {
             const note = parts[1];
             if (noteMap[note]) {
+              // one beat long
               timeline.push({ type: "play", note, time: currentTime });
-              currentTime += 1000;
+              currentTime += (60 / tempoBPM) * 1000;
+            } else {
+              throw new Error(`unknown note: ${note}`);
             }
             break;
           }
 
           case "delay": {
             const ms = parseInt(parts[1]);
+            if (!Number.isFinite(ms) || ms < 0) throw new Error("delay expects milliseconds");
             currentTime += ms;
             break;
           }
 
           case "animate": {
+            // animate <circle|rect|line|sprite> [maybe name] <from triple> -> <to triple> duration Ns [fromColor #.. toColor #..]
+            // For sprite: "animate sprite turtle x y scale -> x y scale duration 8s"
             const shape = parts[1];
-            const from = parts.slice(2, 5).map(Number);
-            const to = parts.slice(6, 9).map(Number);
-            const duration = parseFloat(parts[parts.indexOf("duration") + 1]) * 1000;
+
+            let name = null;
+            let cursor = 2;
+
+            if (shape === "sprite") {
+              name = parts[2];
+              cursor = 3;
+            }
+
+            const arrowIndex = parts.indexOf("->");
+            if (arrowIndex === -1) throw new Error("animate missing '->'");
+
+            const fromArr = parts.slice(cursor, arrowIndex).map(Number);
+            const toArr = parts.slice(arrowIndex + 1, arrowIndex + 4).map(Number);
+
+            const durKey = parts.indexOf("duration");
+            if (durKey === -1) throw new Error("animate missing duration");
+
+            const durStr = parts[durKey + 1];
+            const duration = parseFloat(durStr.replace("s", "")) * 1000;
+
             const fromColor = parts.includes("fromColor") ? parts[parts.indexOf("fromColor") + 1] : null;
             const toColor = parts.includes("toColor") ? parts[parts.indexOf("toColor") + 1] : null;
 
-            timeline.push({ type: "animate", shape, from, to, duration, fromColor, toColor, time: currentTime });
+            const anim = { type: "animate", shape, name, from: fromArr, to: toArr, duration, fromColor, toColor, time: currentTime };
+            timeline.push(anim);
             currentTime += duration;
             currentScene.duration = Math.max(currentScene.duration || 0, currentTime / 1000);
             break;
@@ -195,26 +309,30 @@ document.addEventListener("DOMContentLoaded", () => {
           ctx.fillRect(0, 0, canvas.width, canvas.height);
           break;
         case "draw":
-          ctx.beginPath();
-          ctx.fillStyle = item.color || "#FFF";
           if (item.shape === "circle") {
+            ctx.beginPath();
+            ctx.fillStyle = item.color || "#FFF";
             ctx.arc(item.x, item.y, item.r, 0, 2 * Math.PI);
             ctx.fill();
           } else if (item.shape === "rect") {
+            ctx.fillStyle = item.color || "#FFF";
             ctx.fillRect(item.x, item.y, item.w, item.h);
           } else if (item.shape === "line") {
-            ctx.strokeStyle = item.color;
-            ctx.lineWidth = item.width;
+            ctx.beginPath();
+            ctx.strokeStyle = item.color || "#FFF";
+            ctx.lineWidth = item.width || 1;
             ctx.moveTo(item.x1, item.y1);
             ctx.lineTo(item.x2, item.y2);
             ctx.stroke();
+          } else if (item.shape === "sprite" && item.name === "turtle") {
+            drawTurtle(ctx, item.x, item.y, item.scale || 1, item.color || null);
           }
           break;
         case "sound":
           playTone(item.freq, item.dur);
           break;
         case "play":
-          playTone(noteMap[item.note], 1);
+          playTone(noteMap[item.note], Math.max(0.1, (60 / tempoBPM) * 0.9));
           break;
         case "sequence":
           playSequence(item.notes);
@@ -225,26 +343,43 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     }
 
+    // Draw active animations
     animations = animations.filter(anim => {
       const t = Math.min((now - anim.start) / anim.duration, 1);
-      const [x1, y1, r1] = anim.from;
-      const [x2, y2, r2] = anim.to;
-      const x = x1 + (x2 - x1) * t;
-      const y = y1 + (y2 - y1) * t;
-      const r = r1 + (r2 - r1) * t;
+
+      // Circle/Rect/Line: we already handle circle/rect below; (line morphing can be added Phase 2+)
       const color = anim.fromColor && anim.toColor
         ? interpolateColor(anim.fromColor, anim.toColor, t)
-        : "#FF00FF";
+        : null;
 
-      ctx.beginPath();
       if (anim.shape === "circle") {
+        const [x1, y1, r1] = anim.from;
+        const [x2, y2, r2] = anim.to;
+        const x = x1 + (x2 - x1) * t;
+        const y = y1 + (y2 - y1) * t;
+        const r = r1 + (r2 - r1) * t;
+        ctx.beginPath();
         ctx.arc(x, y, r, 0, 2 * Math.PI);
-        ctx.fillStyle = color;
+        ctx.fillStyle = color || "#FF00FF";
         ctx.fill();
       } else if (anim.shape === "rect") {
-        ctx.fillStyle = color;
-        ctx.fillRect(x, y, r, r);
+        const [x1, y1, w1] = anim.from;
+        const [x2, y2, w2] = anim.to;
+        const x = x1 + (x2 - x1) * t;
+        const y = y1 + (y2 - y1) * t;
+        const w = w1 + (w2 - w1) * t;
+        ctx.fillStyle = color || "#00FFFF";
+        ctx.fillRect(x, y, w, w);
+      } else if (anim.shape === "sprite" && anim.name === "turtle") {
+        // for sprite animate we treat triple as [x, y, scale]
+        const [x1, y1, s1] = anim.from;
+        const [x2, y2, s2] = anim.to;
+        const x = x1 + (x2 - x1) * t;
+        const y = y1 + (y2 - y1) * t;
+        const s = s1 + (s2 - s1) * t;
+        drawTurtle(ctx, x, y, s, anim.fromColor || null); // color variance optional
       }
+
       return t < 1;
     });
 
@@ -294,31 +429,54 @@ document.addEventListener("DOMContentLoaded", () => {
     paused = true;
   });
 
-  // Natural Prompt → Script
+  // Natural Prompt → Script (Phase 1 rules)
   document.getElementById("convert-prompt")?.addEventListener("click", () => {
-    const input = document.getElementById("natural-prompt").value.toLowerCase();
+    const input = document.getElementById("natural-prompt").value.toLowerCase().trim();
     const output = [];
     const colors = {
       red: "#FF0000", green: "#00FF00", blue: "#0000FF",
       yellow: "#FFFF00", purple: "#AA00FF", white: "#FFFFFF", black: "#000000"
     };
 
-    const match = input.match(/(\d+)\s+(red|green|blue|yellow|purple|white|black)\s+(circle|square|rect|rectangle)/);
-    if (match) {
-      const count = parseInt(match[1]);
-      const color = colors[match[2]];
-      const shape = match[3];
+    // Pattern: "<n> <color> <circle|square|rect|rectangle>"
+    const simpleMatch = input.match(/(\d+)\s+(red|green|blue|yellow|purple|white|black)\s+(circle|square|rect|rectangle)/);
+    // Pattern: "turtle crawling" (optional with slow/fast notes)
+    const turtleMatch = input.match(/turtle.*crawling/);
+    const slowMatch = input.match(/slow (note|notes|music|tempo)/);
+    const fastMatch = input.match(/fast (note|notes|music|tempo)/);
+
+    if (turtleMatch) {
+      output.push("canvas 800 600");
+      output.push("background #001122");
+      output.push("tempo " + (slowMatch ? 50 : fastMatch ? 140 : 100));
+      output.push("sprite turtle crawling x=80 y=520 scale=1");
+      output.push("animate sprite turtle 80 520 1 -> 720 520 1 duration 8s");
+      if (slowMatch) {
+        output.push("sequence { C3 E3 G3 }");
+      } else if (fastMatch) {
+        output.push("sequence { C4 E4 G4 C5 }");
+      } else {
+        output.push("sequence { C4 D4 E4 }");
+      }
+    } else if (simpleMatch) {
+      const count = parseInt(simpleMatch[1]);
+      const color = colors[simpleMatch[2]];
+      const shape = simpleMatch[3];
       const spacing = 800 / (count + 1);
 
+      output.push("canvas 800 600");
+      output.push("background #000000");
       for (let i = 0; i < count; i++) {
         if (shape.startsWith("circle")) {
-          output.push(`circle ${spacing * (i + 1)} 300 40 color ${color}`);
+          output.push(`circle ${Math.round(spacing * (i + 1))} 300 40 color ${color}`);
         } else {
-          output.push(`rect ${spacing * (i + 1) - 20} 280 40 40 color ${color}`);
+          output.push(`rect ${Math.round(spacing * (i + 1) - 20)} 280 40 40 color ${color}`);
         }
       }
     } else {
-      output.push("// Unsupported prompt. Try '4 white squares'.");
+      output.push("// Unsupported prompt. Try:");
+      output.push("//  - 'turtle crawling with slow notes'");
+      output.push("//  - '4 white squares'");
     }
 
     codeArea.value = output.join("\n");
@@ -334,21 +492,17 @@ background #000
 circle 200 300 60 color #FF0000
 circle 400 300 60 color #00FF00
 circle 600 300 60 color #0000FF`,
-
       example2: `canvas 800 600
 background #111
 line 100 100 700 100 width 5 color #FF00FF
 line 100 200 700 200 width 5 color #00FFFF
 line 100 300 700 300 width 5 color #FFFF00`,
-
       example3: `canvas 800 600
-background #000
-circle 400 300 80 color #8888FF
-play C4
-sequence {
-  C4 D4 E4 F4 G4
-}
-animate circle 400 300 80 -> 600 300 120 duration 4s fromColor #8888FF toColor #00FF88`
+background #001122
+tempo 60
+sprite turtle crawling x=100 y=520 scale=1
+animate sprite turtle 100 520 1 -> 700 520 1 duration 8s
+sequence { C3 E3 G3 }`
     };
     code.value = examples[val] || "";
   });
@@ -362,6 +516,7 @@ animate circle 400 300 80 -> 600 300 120 duration 4s fromColor #8888FF toColor #
   // Saved Scenes
   function updateSavedScenes() {
     const dropdown = document.getElementById("saved-scenes");
+    if (!dropdown) return;
     dropdown.innerHTML = "<option value=''>Select Saved Scene</option>";
     Object.keys(localStorage).forEach(key => {
       if (key.startsWith("ss-")) {
@@ -384,7 +539,7 @@ animate circle 400 300 80 -> 600 300 120 duration 4s fromColor #8888FF toColor #
 
   document.getElementById("delete-scene")?.addEventListener("click", () => {
     const dropdown = document.getElementById("saved-scenes");
-    const name = dropdown.value;
+    const name = dropdown?.value;
     if (name && confirm("Delete scene '" + name + "'?")) {
       localStorage.removeItem("ss-" + name);
       updateSavedScenes();
