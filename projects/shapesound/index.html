@@ -16,7 +16,7 @@
 
     <!-- Natural Prompt Box -->
     <div id="prompt-box">
-      <input type="text" id="natural-prompt" placeholder="Describe your scene (e.g., '3 red circles')" />
+      <input type="text" id="natural-prompt" placeholder="Describe your scene (e.g., 'turtle crawling with slow notes' or '4 white squares')" />
       <button id="convert-prompt">Generate</button>
     </div>
 
@@ -35,7 +35,7 @@
         <option value="">Load Example</option>
         <option value="example1">Rainbow Circle</option>
         <option value="example2">Line Dance</option>
-        <option value="example3">Tones & Shapes</option>
+        <option value="example3">Turtle Crawl (tempo + sequence)</option>
       </select>
 
       <select id="saved-scenes"></select>
@@ -66,6 +66,7 @@
       <pre>
 canvas 800 600
 background #000000
+tempo 100  <!-- beats per minute; affects 'play' and 'sequence' -->
 
 circle 400 300 50 color #FF0000
 rect 100 100 100 100 color #00FF00
@@ -77,7 +78,18 @@ sequence {
   C4 D4 E4 F4
 }
 
-animate circle 100 100 40 -> 400 400 60 duration 3s fromColor #FF0000 toColor #00FF00
+# Procedural sprite (Phase 1):
+# - Draws a turtle built from primitives
+# - 'crawling' is the action label (for future behaviors)
+# - x, y, scale are supported
+sprite turtle crawling x=100 y=520 scale=1
+
+# Animate a sprite:
+# For sprites, the triples are: x y scale
+animate sprite turtle 100 520 1 -> 700 520 1 duration 8s
+
+# Color transitions for circle/rect:
+animate circle 300 300 30 -> 500 300 80 duration 5s fromColor #FF0000 toColor #00FF00
 delay 1000
       </pre>
     </div>
