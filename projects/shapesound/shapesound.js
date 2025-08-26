@@ -1,4 +1,7 @@
 // projects/shapesound/shapesound.js
+// NOTE: index.html should include this with: <script type="module" src="shapesound.js"></script>
+
+import { promptToDSL, loadTinyGPT } from './tinygpt.js';
 
 // ------------------------------
 // Notes / Frequencies
@@ -15,7 +18,7 @@ const noteMap = {
 // Global runtime state
 // ------------------------------
 let tempoBPM = 100;
-let animations = [];        // active animation tweens (circles/rects & sprites)
+let animations = [];        // active animation tweens (shapes & sprites)
 let timeline = [];          // scheduled events (sorted by time asc)
 let currentScene = { duration: 10 };
 
@@ -55,37 +58,13 @@ function stepSpriteAnimation(s, dtSec) {
   s.frame = (s.frame || 0) + fps * dtSec;
 }
 
-function drawSprite(ctx, s) {
-  if (s.type === 'image') {
-    const img = ASSETS.images[s.key];
-    if (!img) return;
-    const w = img.width * (s.scale || 1);
-    const h = img.height * (s.scale || 1);
-    ctx.save();
-    ctx.translate(s.x, s.y);
-    if (s.rot) ctx.rotate((s.rot * Math.PI) / 180);
-    ctx.scale(s.flipX ? -1 : 1, s.flipY ? -1 : 1);
-    ctx.drawImage(img, -w / 2, -h / 2, w, h);
-    ctx.restore();
-  } else if (s.type === 'sheet') {
-    const sheet = ASSETS.sheets[s.key];
-    if (!sheet) return;
-    const { img, frameW, frameH, frames } = sheet;
-    const frame = Math.floor(s.frame || 0) % frames;
-
-    // frame index -> src rect (assuming row-major strip)
-    const perRow = Math.max(1, Math.floor(img.width / frameW));
-    const sx = (frame % perRow) * frameW;
-    const sy = Math.floor(frame / perRow) * frameH;
-
-    const w = frameW * (s.scale || 1);
-    const h = frameH * (s.scale || 1);
-    ctx.save();
-    ctx.translate(s.x, s.y);
-    if (s.rot) ctx.rotate((s.rot * Math.PI) / 180);
-    ctx.scale(s.flipX ? -1 : 1, s.flipY ? -1 : 1);
-    ctx.drawImage(img, sx, sy, frameW, frameH, -w / 2, -h / 2, w, h);
-    ctx.restore();
+// Easing
+function applyEase(t, ease) {
+  switch ((ease || "linear").toLowerCase()) {
+    case "in":      return t * t;
+    case "out":     return t * (2 - t);
+    case "in-out":  return t < 0.5 ? 2*t*t : -1 + (4 - 2*t) * t;
+    default:        return t; // linear
   }
 }
 
@@ -130,7 +109,7 @@ function interpolateColor(c1, c2, t) {
 }
 
 // ------------------------------
-// Procedural Turtle (Phase 1)
+// Procedural Turtle
 // ------------------------------
 function drawTurtle(ctx, x, y, scale = 1, colorVariant = null) {
   const greens = ["#228B22", "#2E8B57", "#006400"];
@@ -215,6 +194,78 @@ function stepPhysics(dtSec, canvas) {
 }
 
 // ------------------------------
+// Sprite drawing with wiggle + fallbacks
+// ------------------------------
+function drawSpriteFallback(ctx, s, x, y) {
+  const looksLikeTurtle = (s.key && /turtle/i.test(s.key)) || (s.id && /turtle/i.test(s.id));
+  if (looksLikeTurtle) {
+    drawTurtle(ctx, x, y, s.scale || 1, null);
+    return;
+  }
+  const w = 60 * (s.scale || 1);
+  const h = 60 * (s.scale || 1);
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.fillStyle = "#5559ff";
+  ctx.fillRect(-w/2, -h/2, w, h);
+  ctx.fillStyle = "#111";
+  ctx.fillRect(-w/2+6, -h/2+6, w-12, h-12);
+  ctx.restore();
+}
+
+function drawSprite(ctx, s) {
+  // wiggle offsets
+  let dx = 0, dy = 0;
+  if (s.wiggle && lastNow != null && startTime != null) {
+    const t = (lastNow - startTime) / 1000; // seconds
+    const freq = s.wiggle.freq || 1;
+    const ampX = s.wiggle.ampX || s.wiggle.amp || 0;
+    const ampY = s.wiggle.ampY || s.wiggle.amp || 0;
+    dx = Math.sin(t * Math.PI * 2 * freq) * ampX;
+    dy = Math.cos(t * Math.PI * 2 * freq) * ampY;
+  }
+
+  const tx = (s.x || 0) + dx;
+  const ty = (s.y || 0) + dy;
+
+  if (s.type === 'image') {
+    const img = ASSETS.images[s.key];
+    if (!img) {
+      drawSpriteFallback(ctx, s, tx, ty);
+      return;
+    }
+    const w = img.width * (s.scale || 1);
+    const h = img.height * (s.scale || 1);
+    ctx.save();
+    ctx.translate(tx, ty);
+    if (s.rot) ctx.rotate((s.rot * Math.PI) / 180);
+    ctx.scale(s.flipX ? -1 : 1, s.flipY ? -1 : 1);
+    ctx.drawImage(img, -w / 2, -h / 2, w, h);
+    ctx.restore();
+  } else if (s.type === 'sheet') {
+    const sheet = ASSETS.sheets[s.key];
+    if (!sheet) {
+      drawSpriteFallback(ctx, s, tx, ty);
+      return;
+    }
+    const { img, frameW, frameH, frames } = sheet;
+    const frame = Math.floor(s.frame || 0) % frames;
+    const perRow = Math.max(1, Math.floor(img.width / frameW));
+    const sx = (frame % perRow) * frameW;
+    const sy = Math.floor(frame / perRow) * frameH;
+
+    const w = frameW * (s.scale || 1);
+    const h = frameH * (s.scale || 1);
+    ctx.save();
+    ctx.translate(tx, ty);
+    if (s.rot) ctx.rotate((s.rot * Math.PI) / 180);
+    ctx.scale(s.flipX ? -1 : 1, s.flipY ? -1 : 1);
+    ctx.drawImage(img, sx, sy, frameW, frameH, -w / 2, -h / 2, w, h);
+    ctx.restore();
+  }
+}
+
+// ------------------------------
 // Boot
 // ------------------------------
 document.addEventListener("DOMContentLoaded", () => {
@@ -236,6 +287,8 @@ document.addEventListener("DOMContentLoaded", () => {
     DRAWN_OBJECTS.length = 0;
     CURRENT_BG = "#000000";
     tempoBPM = 100;
+    for (const k in SPRITES) delete SPRITES[k];
+
     PHYSICS.enabled = false;
     PHYSICS.gravity = { x: 0, y: 0 };
     PHYSICS.damping = 1.0;
@@ -338,7 +391,7 @@ document.addEventListener("DOMContentLoaded", () => {
             break;
           }
 
-          // Procedural sprite turtle (Phase 1)
+          // Procedural sprite turtle
           case "sprite": {
             const name = parts[1];         // turtle
             const action = parts[2] || ""; // crawling
@@ -351,9 +404,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const color = kv.color || null;
 
             if (name !== "turtle") throw new Error(`unknown sprite: ${name}`);
-            // we record a draw event; actual drawing is in render
             timeline.push({ type: "draw", shape: "sprite-turtle", x, y, scale, color, action, time: currentTime });
-            // and store a retained representation as a pseudo-sprite
             DRAWN_OBJECTS.push({ type: "sprite-turtle", x, y, scale, color, action });
             break;
           }
@@ -369,7 +420,6 @@ document.addEventListener("DOMContentLoaded", () => {
               if (!src) throw new Error('asset image missing "src"');
               loadImage(src).then(img => (ASSETS.images[key] = img));
             } else if (kind === "spritesheet") {
-              // key made from 2nd+3rd tokens (e.g., turtle walk -> turtle_walk)
               const key = (parts[2] || "sheet") + (parts[3] ? "_" + parts[3] : "");
               const src = line.match(/"([^"]+)"/)?.[1];
               const fIdx = parts.indexOf("frame");
@@ -390,7 +440,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
           // Sprite instances from assets
           case "spriteimg": {
-            // spriteimg turtle1 from spritesheet turtle_walk at 120 500 scale 1.2
+            // spriteimg turtle1 from spritesheet turtle_walk at 120 520 scale 1.2
             const id = parts[1];
             if (!id) throw new Error("spriteimg requires an id");
             const fromIdx = parts.indexOf("from");
@@ -405,10 +455,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
             if (kind === "image") {
               if (!ASSETS.images[key]) console.warn(`image asset '${key}' not loaded yet`);
-              SPRITES[id] = { type: 'image', key, x, y, scale, physics: false };
+              SPRITES[id] = { id, type: 'image', key, x, y, scale, physics: false };
             } else if (kind === "spritesheet") {
               if (!ASSETS.sheets[key]) console.warn(`spritesheet asset '${key}' not loaded yet`);
-              SPRITES[id] = { type: 'sheet', key, x, y, scale, frame: 0, playing: false, physics: false };
+              SPRITES[id] = { id, type: 'sheet', key, x, y, scale, frame: 0, playing: false, physics: false };
             } else {
               throw new Error("spriteimg 'from' must be 'image' or 'spritesheet'");
             }
@@ -465,9 +515,27 @@ document.addEventListener("DOMContentLoaded", () => {
             break;
           }
 
-          // Path shorthand (linear) -> animatesprite
+          // Wiggle
+          case "wiggle": {
+            // wiggle <id> ampX ampY freq  OR  wiggle <id> amp freq
+            const id = parts[1];
+            const a2 = parseFloat(parts[2]);
+            const a3 = parseFloat(parts[3]);
+            const a4 = parseFloat(parts[4]);
+            if (!SPRITES[id]) break;
+            if (Number.isFinite(a2) && Number.isFinite(a3) && Number.isFinite(a4)) {
+              SPRITES[id].wiggle = { ampX: a2, ampY: a3, freq: a4 };
+            } else if (Number.isFinite(a2) && Number.isFinite(a3)) {
+              SPRITES[id].wiggle = { amp: a2, freq: a3 };
+            } else {
+              throw new Error("wiggle expects: wiggle <id> ampX ampY freq  OR  wiggle <id> amp freq");
+            }
+            break;
+          }
+
+          // Path shorthand (linear) -> animatesprite (with ease)
           case "path": {
-            // path <id> (x1,y1) -> (x2,y2) duration 5s
+            // path <id> (x1,y1) -> (x2,y2) duration 5s [ease in|out|in-out|linear]
             const id = parts[1];
             const arrow = parts.indexOf("->");
             if (arrow === -1) throw new Error("path missing '->'");
@@ -476,11 +544,16 @@ document.addEventListener("DOMContentLoaded", () => {
             const durKey = parts.indexOf("duration");
             if (durKey === -1) throw new Error("path missing duration");
             const duration = parseFloat(parts[durKey + 1].replace("s", "")) * 1000;
+
+            let ease = "linear";
+            const easeIdx = parts.indexOf("ease");
+            if (easeIdx !== -1) ease = (parts[easeIdx + 1] || "linear");
+
             const s = SPRITES[id];
             const scale = s?.scale ?? 1;
             const from = [parseFloat(p1[0]), parseFloat(p1[1]), scale];
             const to   = [parseFloat(p2[0]), parseFloat(p2[1]), scale];
-            timeline.push({ type: "animatesprite", id, from, to, duration, time: currentTime });
+            timeline.push({ type: "animatesprite", id, from, to, duration, ease, time: currentTime });
             currentTime += duration;
             currentScene.duration = Math.max(currentScene.duration || 0, currentTime / 1000);
             break;
@@ -490,7 +563,6 @@ document.addEventListener("DOMContentLoaded", () => {
           case "animate": {
             const shape = parts[1];
 
-            // sprite id triple: x y scale
             if (shape === "sprite") {
               const id = parts[2];
               const arrowIndex = parts.indexOf("->");
@@ -500,7 +572,12 @@ document.addEventListener("DOMContentLoaded", () => {
               const durKey = parts.indexOf("duration");
               if (durKey === -1) throw new Error("animate missing duration");
               const duration = parseFloat(parts[durKey + 1].replace("s", "")) * 1000;
-              timeline.push({ type: "animatesprite", id, from, to, duration, time: currentTime });
+
+              let ease = "linear";
+              const easeIdx = parts.indexOf("ease");
+              if (easeIdx !== -1) ease = (parts[easeIdx + 1] || "linear");
+
+              timeline.push({ type: "animatesprite", id, from, to, duration, ease, time: currentTime });
               currentTime += duration;
               currentScene.duration = Math.max(currentScene.duration || 0, currentTime / 1000);
               break;
@@ -515,7 +592,11 @@ document.addEventListener("DOMContentLoaded", () => {
             const fromColor = parts.includes("fromColor") ? parts[parts.indexOf("fromColor") + 1] : null;
             const toColor = parts.includes("toColor") ? parts[parts.indexOf("toColor") + 1] : null;
 
-            timeline.push({ type: "animate", shape, from, to, duration, fromColor, toColor, time: currentTime });
+            let ease = "linear";
+            const easeIdx = parts.indexOf("ease");
+            if (easeIdx !== -1) ease = (parts[easeIdx + 1] || "linear");
+
+            timeline.push({ type: "animate", shape, from, to, duration, fromColor, toColor, ease, time: currentTime });
             currentTime += duration;
             currentScene.duration = Math.max(currentScene.duration || 0, currentTime / 1000);
             break;
@@ -565,12 +646,12 @@ document.addEventListener("DOMContentLoaded", () => {
           break;
 
         case "draw": {
-          // already retained in DRAWN_OBJECTS; nothing else to do
+          // retained in DRAWN_OBJECTS already
           break;
         }
 
         case "drawsprite":
-          // sprite instance already exists in SPRITES; nothing else to do
+          // instance already exists in SPRITES
           break;
 
         case "sound":
@@ -628,7 +709,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Active animations (shapes and sprites)
     animations = animations.filter(anim => {
-      const t = Math.min((now - anim.start) / anim.duration, 1);
+      let t = Math.min((now - anim.start) / anim.duration, 1);
+      t = applyEase(t, anim.ease);
 
       if (anim.type === "animate") {
         const color = anim.fromColor && anim.toColor
@@ -662,7 +744,6 @@ document.addEventListener("DOMContentLoaded", () => {
         s.x = x1 + (x2 - x1) * t;
         s.y = y1 + (y2 - y1) * t;
         s.scale = sc1 + (sc2 - sc1) * t;
-        // sprite is drawn in the sprites pass above
       }
 
       return t < 1;
@@ -688,7 +769,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // ------------------
-  // UI Extras
+  // Extra Controls
   // ------------------
 
   // Timeline controls
@@ -698,15 +779,18 @@ document.addEventListener("DOMContentLoaded", () => {
     lastNow = startTime;
     requestAnimationFrame(loop);
   });
+
   document.getElementById("pause-scene")?.addEventListener("click", () => {
     paused = true;
   });
+
   document.getElementById("resume-scene")?.addEventListener("click", () => {
     paused = false;
     startTime = performance.now() - pauseOffset;
     lastNow = startTime;
     requestAnimationFrame(loop);
   });
+
   document.getElementById("timeline-scrubber")?.addEventListener("input", (e) => {
     if (!currentScene.duration) return;
     const percent = parseFloat(e.target.value) / 100;
@@ -714,7 +798,7 @@ document.addEventListener("DOMContentLoaded", () => {
     paused = true;
   });
 
-  // Natural Prompt → Script (rules incl. turtle)
+  // Natural Prompt → Script (Rule-based quick gen stays; AI is separate button)
   document.getElementById("convert-prompt")?.addEventListener("click", () => {
     const input = document.getElementById("natural-prompt").value.toLowerCase().trim();
     const output = [];
@@ -733,7 +817,7 @@ document.addEventListener("DOMContentLoaded", () => {
       output.push("background #001122");
       output.push("tempo " + (slowMatch ? 50 : fastMatch ? 140 : 100));
       output.push("sprite turtle crawling x=80 y=520 scale=1");
-      output.push("animate sprite turtle 80 520 1 -> 720 520 1 duration 8s");
+      output.push("animate sprite turtle 80 520 1 -> 720 520 1 duration 8s ease in-out");
       if (slowMatch) {
         output.push("sequence { C3 E3 G3 }");
       } else if (fastMatch) {
@@ -757,9 +841,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       }
     } else {
-      output.push("// Unsupported prompt. Try:");
-      output.push("//  - 'turtle crawling with slow notes'");
-      output.push("//  - '4 white squares'");
+      output.push("// Unsupported prompt. Try 'turtle crawling with slow notes' or '4 white squares'.");
     }
 
     codeArea.value = output.join("\n");
@@ -784,7 +866,7 @@ line 100 300 700 300 width 5 color #FFFF00`,
 background #001122
 tempo 60
 sprite turtle crawling x=100 y=520 scale=1
-animate sprite turtle 100 520 1 -> 700 520 1 duration 8s
+animate sprite turtle 100 520 1 -> 700 520 1 duration 8s ease in-out
 sequence { C3 E3 G3 }`
     };
     code.value = examples[val] || "";
@@ -829,7 +911,7 @@ sequence { C3 E3 G3 }`
   document.getElementById("saved-scenes")?.addEventListener("change", (e) => {
     const name = e.target.value;
     if (name) {
-      codeArea.value = localStorage.getItem("ss-" + name);
+      document.getElementById("code").value = localStorage.getItem("ss-" + name);
     }
   });
   updateSavedScenes();
@@ -849,32 +931,46 @@ sequence { C3 E3 G3 }`
     });
   });
 
-  // Export JSON (simple: wrap script text)
-  document.getElementById("save-json")?.addEventListener("click", () => {
-    const data = { sceneScript: codeArea.value, savedAt: new Date().toISOString() };
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download = "scene.json";
-    link.click();
-  });
+  // ---- AI Integration (TF.js path handled in tinygpt.js) ----
+  (async function setupAI() {
+    const aiBtn = document.getElementById('ai-generate');
+    const aiStatus = document.getElementById('ai-status');
+    const aiRetry = document.getElementById('ai-retry');
+    if (!aiBtn) return;
 
-  // Import JSON (expects { sceneScript: "..." } )
-  document.getElementById("load-json")?.addEventListener("change", (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
+    let loaded = false;
+    async function ensureLoaded() {
+      if (!loaded) { aiStatus.style.display = 'inline'; await loadTinyGPT(); aiStatus.style.display = 'none'; loaded = true; }
+    }
+
+    aiBtn.addEventListener('click', async () => {
+      const prompt = (document.getElementById('natural-prompt')?.value || "").trim();
+      if (!prompt) { alert("Enter a prompt first."); return; }
+      await ensureLoaded();
+
+      aiStatus.style.display = 'inline';
+      aiRetry.style.display = 'none';
       try {
-        const json = JSON.parse(reader.result);
-        if (json.sceneScript) codeArea.value = json.sceneScript;
-        else alert("JSON missing 'sceneScript' field.");
-      } catch (err) {
-        alert("Invalid JSON file.");
+        const { ok, errors, dsl } = await promptToDSL(prompt);
+        aiStatus.style.display = 'none';
+        if (!ok) {
+          const box = document.getElementById('error-box');
+          box.style.display = 'block';
+          box.textContent = "AI output had issues:\n" + errors.slice(0,5).join("\n");
+          aiRetry.style.display = 'inline';
+        }
+        document.getElementById('code').value = dsl;
+      } catch (e) {
+        aiStatus.style.display = 'none';
+        aiRetry.style.display = 'inline';
+        const box = document.getElementById('error-box');
+        box.style.display = 'block';
+        box.textContent = "AI generation failed: " + e.message;
       }
-    };
-    reader.readAsText(file);
-    // reset input so same file can be loaded again
-    e.target.value = "";
-  });
+    });
+
+    aiRetry?.addEventListener('click', async () => {
+      aiBtn.click();
+    });
+  })();
 });
