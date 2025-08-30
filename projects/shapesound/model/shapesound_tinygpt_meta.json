@@ -1,0 +1,5 @@
+{
+  "source_checkpoint": "/root/projects/shapesound/checkpoints/tinygpt_pt",
+  "export_type": "tfjs-graph",
+  "quantize_float16": false
+}
