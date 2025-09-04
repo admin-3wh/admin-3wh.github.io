@@ -4,30 +4,74 @@
  */
 
 (function () {
-  const ROOT = '/projects/shapesound/model';
-  const TFJS_MODEL_URL = `${ROOT}/model.json`;
-  const VOCAB_URL = `${ROOT}/vocab.json`;
-  const MERGES_URL = `${ROOT}/merges.txt`;
-  const TOKENIZER_JSON_URL = `${ROOT}/tokenizer.json`; // optional (not required)
+  // ---------- Remote (HF) + Local fallbacks ----------
+  const HF_REPO = 'admin-3wh/shapesound-tinygpt';
+  const HF_BASE = `https://huggingface.co/${HF_REPO}/resolve/main`;
+  const LOCAL_BASE = '/projects/shapesound/model';
+
+  const CANDIDATE_MODEL_URLS = [
+    `${HF_BASE}/model.json`,
+    `${LOCAL_BASE}/model.json`,
+  ];
+  const CANDIDATE_TOKENIZER_JSON = [
+    `${HF_BASE}/tokenizer.json`,
+    `${LOCAL_BASE}/tokenizer.json`,
+  ];
+  const CANDIDATE_VOCAB_URLS = [
+    `${HF_BASE}/vocab.json`,
+    `${LOCAL_BASE}/vocab.json`,
+  ];
+  const CANDIDATE_MERGES_URLS = [
+    `${HF_BASE}/merges.txt`,
+    `${LOCAL_BASE}/merges.txt`,
+  ];
 
   // ===== Utilities =====
   async function fetchJSON(url) {
-    const r = await fetch(url);
+    const r = await fetch(url, { cache: 'no-store' });
     if (!r.ok) throw new Error(`fetch failed: ${url} ${r.status}`);
     return r.json();
   }
   async function fetchText(url) {
-    const r = await fetch(url);
+    const r = await fetch(url, { cache: 'no-store' });
     if (!r.ok) throw new Error(`fetch failed: ${url} ${r.status}`);
     return r.text();
   }
+  async function firstOkJSON(urls) {
+    let lastErr;
+    for (const u of urls) {
+      try { return await fetchJSON(u); } catch (e) { lastErr = e; }
+    }
+    throw lastErr || new Error('No JSON source succeeded');
+  }
+  async function firstOkText(urls) {
+    let lastErr;
+    for (const u of urls) {
+      try { return await fetchText(u); } catch (e) { lastErr = e; }
+    }
+    throw lastErr || new Error('No text source succeeded');
+  }
+  async function firstOkGraphModel(urls) {
+    let lastErr;
+    for (const u of urls) {
+      try {
+        console.log('[TinyGPT] Trying model:', u);
+        const m = await tf.loadGraphModel(u);
+        console.log('[TinyGPT] Loaded model:', u);
+        return m;
+      } catch (e) {
+        console.warn('[TinyGPT] Failed model URL:', u, e);
+        lastErr = e;
+      }
+    }
+    throw lastErr || new Error('No model source succeeded');
+  }
 
   // ===== GPT-2 Byte encoder/decoder =====
-  // Reference mapping from OpenAI GPT-2.
-  // These tables reproduce the reversible byte<->unicode map used before BPE.
   function bytes_to_unicode() {
-    const bs = [];
-    const cs = [];
+    // canonical GPT-2 byte<->unicode maps
+    let bs = [];
+    let cs = [];
     for (let i = 33; i < 127; i++) bs.push(i);
     for (let i = 161; i < 173; i++) bs.push(i);
     for (let i = 174; i < 256; i++) bs.push(i);
@@ -39,40 +83,16 @@
         n++;
       }
     }
-    const bd = {};
-    const cd = {};
-    bs.forEach((b, i) => {
-      bd[b] = String.fromCharCode(bs[i]);
-    });
-    bs.forEach((b, i) => {
-      const c = (i < bs.length - (256 - 33 - (173 - 161) - (256 - 174))) ? bs[i] : cs[i - (33 - 0) - (173 - 161) - (256 - 174)];
-      cd[String.fromCharCode(bs[i])] = c;
-    });
-    // Correct mapping creation (above is messy); use canonical implementation:
     const byteToUnicode = {};
     const unicodeToByte = {};
-    let bs2 = [];
-    let cs2 = [];
-    for (let i = 33; i < 127; i++) bs2.push(i);
-    for (let i = 161; i < 173; i++) bs2.push(i);
-    for (let i = 174; i < 256; i++) bs2.push(i);
-    let csIdx = 0;
-    for (let b = 0; b < 256; b++) {
-      if (!bs2.includes(b)) {
-        bs2.push(b);
-        cs2.push(256 + csIdx);
-        csIdx++;
-      }
-    }
-    for (let i = 0; i < bs2.length; i++) {
-      const b = bs2[i];
-      const c = i < 256 ? b : cs2[i - 256];
+    for (let i = 0; i < bs.length; i++) {
+      const b = bs[i];
+      const c = i < 256 ? b : cs[i - 256];
       byteToUnicode[b] = String.fromCharCode(c);
       unicodeToByte[String.fromCharCode(c)] = b;
     }
     return { byteToUnicode, unicodeToByte };
   }
-
   const { byteToUnicode, unicodeToByte } = bytes_to_unicode();
 
   function text_to_bytes(text) {
@@ -148,7 +168,7 @@
   // ===== Tokenizer (GPT-2) =====
   class GPT2Tokenizer {
     constructor(vocab, merges) {
-      this.encoder = vocab; // token -> id (actually id by token string key index)
+      this.encoder = vocab; // token string -> id
       this.decoder = {};
       for (const [k, v] of Object.entries(vocab)) this.decoder[v] = k;
 
@@ -166,7 +186,6 @@
     }
 
     encode(text) {
-      // Byte encode then split by regex, then BPE
       const bpeTokens = [];
       const matches = text.match(GPT2_SPLIT_RE) || [];
       for (const token of matches) {
@@ -174,7 +193,6 @@
         const bpeStr = bpe(tokenBytes, this.bpeRanks, this.cache);
         const toks = bpeStr.split(' ').map(t => {
           if (!(t in this.encoder)) {
-            // unknown token fallback: use bytewise
             return this.encoder['<|unk|>'] ?? 0;
           }
           return this.encoder[t];
@@ -200,30 +218,53 @@
     const lines = dsl.split('\n').map(l => l.trim()).filter(Boolean);
     if (lines.length === 0) return false;
 
-    // Known commands
     const cmdRe = /^(canvas|background|tempo|circle|rect|line|sound|play|sequence|animate|delay|sprite)\b/;
-    // hex color
-    const hexRe = /#([0-9a-fA-F]{6})\b/;
 
     let seqDepth = 0;
     for (const line of lines) {
       if (line.startsWith('sequence')) { seqDepth++; continue; }
       if (line === '}' && seqDepth > 0) { seqDepth--; continue; }
-      if (!cmdRe.test(line) && line !== '}') {
-        // allow blank comments? disallow here
-        return false;
-      }
-      if (/(background)/.test(line) && !hexRe.test(line)) {
-        // background should have a hex
-        // not strictly necessary, but helps filter gibberish
-      }
+      if (!cmdRe.test(line) && line !== '}') return false;
     }
     if (seqDepth !== 0) return false;
-    // at least 1 drawable or timeline op
     const hasRenderable = lines.some(l =>
       /^(circle|rect|line|sprite|animate|background|play|sound|sequence)/.test(l)
     );
     return hasRenderable;
+  }
+
+  // ===== Fallback scaffold =====
+  function fallbackFromPrompt(prompt) {
+    const w = 800, h = 600;
+    const base = [
+      `canvas ${w} ${h}`,
+      `background #001122`,
+      `tempo 90`,
+    ];
+    if (/turtle/i.test(prompt)) {
+      base.push(
+        `sprite turtle crawling x=60 y=540 scale=1`,
+        `animate sprite turtle 60 540 1 -> 740 540 1 duration 8s`,
+        `sequence { C4 E4 G4 B4 }`
+      );
+    } else if (/(\d+)\s+(white|red|green|blue|yellow|purple)\s+(squares?|rect(angles?)?)/i.test(prompt)) {
+      const m = prompt.match(/(\d+)/);
+      const count = Math.max(1, Math.min(10, parseInt(m?.[1] || '4', 10)));
+      const spacing = Math.floor(w / (count + 1));
+      for (let i = 0; i < count; i++) {
+        base.push(`rect ${spacing * (i + 1) - 20} ${(h/2 - 20) | 0} 40 40 color #FFFFFF`);
+      }
+    } else {
+      base.push(
+        `circle ${(w/2)|0} ${(h/2)|0} 60 color #44AAFF`,
+        `play C4`,
+        `delay 400`,
+        `play E4`,
+        `delay 400`,
+        `play G4`
+      );
+    }
+    return base.join('\n');
   }
 
   // ===== Model wrapper =====
@@ -235,19 +276,31 @@
     _outputKey: null,
 
     async _loadTokenizer() {
-      // Prefer vocab.json + merges.txt
-      const [vocab, merges] = await Promise.all([
-        fetchJSON(VOCAB_URL),
-        fetchText(MERGES_URL),
-      ]);
-      return new GPT2Tokenizer(vocab, merges);
+      // Try tokenizer.json (HF or local). If not present, fall back to vocab+merges.
+      try {
+        const tok = await firstOkJSON(CANDIDATE_TOKENIZER_JSON);
+        // Expect GPT-2 style tokenizer.json: { model: { vocab: {...}, merges: [...] } }
+        if (tok?.model?.vocab && tok?.model?.merges) {
+          const vocab = tok.model.vocab; // token -> id
+          const merges = tok.model.merges.join('\n');
+          return new GPT2Tokenizer(vocab, merges);
+        }
+        console.warn('[TinyGPT] tokenizer.json present but not GPT-2 BPE shape; falling back to vocab+merges.');
+        throw new Error('Tokenizer JSON incompatible');
+      } catch {
+        const [vocab, merges] = await Promise.all([
+          firstOkJSON(CANDIDATE_VOCAB_URLS),
+          firstOkText(CANDIDATE_MERGES_URLS),
+        ]);
+        return new GPT2Tokenizer(vocab, merges);
+      }
     },
 
     async _inferIOKeys(model) {
-      // GraphModel.inputs[0].name and outputs[0].name are the safest bet
-      // Common names: 'input_ids' / 'model/Transformer/strided_slice:0' etc.
-      const inName = model.inputs[0]?.name;
-      const outName = model.outputs[0]?.name;
+      // Best-effort names; different converters use different tensor names.
+      const inName = model.inputs?.[0]?.name;
+      const outName = model.outputs?.[0]?.name;
+      console.log('[TinyGPT] IO keys:', { input: inName, output: outName });
       return { inName, outName };
     },
 
@@ -255,7 +308,7 @@
       if (this._ready) return this._ready;
       this._ready = (async () => {
         this._tokenizer = await this._loadTokenizer();
-        this._model = await tf.loadGraphModel(TFJS_MODEL_URL);
+        this._model = await firstOkGraphModel(CANDIDATE_MODEL_URLS);
         const { inName, outName } = await this._inferIOKeys(this._model);
         this._inputKey = inName;
         this._outputKey = outName;
@@ -265,11 +318,6 @@
 
     /**
      * Generate text with greedy or top-k sampling
-     * @param {string} prompt
-     * @param {object} opts
-     *  - maxNewTokens: number
-     *  - temperature: number (>=0; 0 => greedy)
-     *  - topK: integer (0 or >0)
      */
     async generate(prompt, opts = {}) {
       await this.load();
@@ -277,44 +325,40 @@
         maxNewTokens = 96,
         temperature = 0.7,
         topK = 40,
-        stopTokens = [], // optional token IDs to stop on
+        stopTokens = [],
       } = opts;
 
       let inputIds = this._tokenizer.encode(prompt);
-      // Keep a modest context (GPT-2 small has 1024, but browser mem matters)
       const MAX_CTX = 512;
 
       for (let step = 0; step < maxNewTokens; step++) {
         const ctxIds = inputIds.slice(-MAX_CTX);
         const x = tf.tensor(ctxIds, [1, ctxIds.length], 'int32');
 
-        let logits;
+        let outputs, logits;
         try {
-          // Some models require executeAsync with control flow
-          const outputs = (this._model.executeAsync
+          outputs = (this._model.executeAsync
             ? await this._model.executeAsync({ [this._inputKey]: x })
             : this._model.execute({ [this._inputKey]: x }));
 
-          // Try first tensor
           logits = Array.isArray(outputs) ? outputs[0] : outputs;
+          if (!logits || logits.shape.length !== 3) {
+            throw new Error(`[TinyGPT] Unexpected logits shape ${logits?.shape}. Expected [1, seq, vocab].`);
+          }
         } catch (e) {
           x.dispose();
-          console.error('[TinyGPT] execute failed with key', this._inputKey, e);
+          console.error('[TinyGPT] Inference error. Input key:', this._inputKey, 'Model inputs:', this._model.inputs?.map(i=>i.name), e);
           throw e;
         }
 
-        // logits shape: [1, seq, vocab]
         const lastLogits = logits.slice([0, logits.shape[1] - 1, 0], [1, 1, logits.shape[2]]).squeeze([0, 1]);
 
         let nextId;
         if (temperature <= 0) {
-          // Greedy: argmax
-          const { values, indices } = tf.topk(lastLogits, 1);
-          const id = (await indices.data())[0];
-          nextId = id;
-          values.dispose(); indices.dispose();
+          const { indices } = tf.topk(lastLogits, 1);
+          nextId = (await indices.data())[0];
+          indices.dispose();
         } else {
-          // Temperature + optional top-k
           let logitsAdj = lastLogits.div(tf.scalar(temperature));
           if (topK && topK > 0) {
             const { values, indices } = tf.topk(logitsAdj, topK);
@@ -364,66 +408,27 @@ End sequences with a closing curly brace on its own line.
         topK: 50,
       });
 
-      // Heuristic: take everything AFTER the final <SEP>
       const parts = raw.split('<SEP>');
       const candidate = (parts.length > 1 ? parts[parts.length - 1] : raw).trim();
 
-      // Clean up: stop at first double newline of non-DSL chatter (if any)
       const cleaned = candidate
         .replace(/\r/g, '')
-        .split('\n\n')[0] // often model babbles after a blank line
+        .split('\n\n')[0]
         .trim();
 
       if (isValidDSL(cleaned)) return cleaned;
 
-      // Fallback: simple deterministic scaffold mapping
       return fallbackFromPrompt(userPrompt);
     }
   };
 
   function sampleFromDistribution(probsArray) {
-    // probsArray sums to ~1
     let r = Math.random();
     for (let i = 0; i < probsArray.length; i++) {
       r -= probsArray[i];
       if (r <= 0) return i;
     }
     return probsArray.length - 1;
-  }
-
-  // ===== Very small fallback to keep app responsive if validation fails =====
-  function fallbackFromPrompt(prompt) {
-    const w = 800, h = 600;
-    const base = [
-      `canvas ${w} ${h}`,
-      `background #001122`,
-      `tempo 90`,
-    ];
-    if (/turtle/i.test(prompt)) {
-      base.push(
-        `sprite turtle crawling x=60 y=540 scale=1`,
-        `animate sprite turtle 60 540 1 -> 740 540 1 duration 8s`,
-        `sequence { C4 E4 G4 B4 }`
-      );
-    } else if (/(\d+)\s+(white|red|green|blue|yellow|purple)\s+(squares?|rect(angles?)?)/i.test(prompt)) {
-      const m = prompt.match(/(\d+)/);
-      const count = Math.max(1, Math.min(10, parseInt(m?.[1] || '4', 10)));
-      const spacing = Math.floor(w / (count + 1));
-      for (let i = 0; i < count; i++) {
-        base.push(`rect ${spacing * (i + 1) - 20} ${h/2 - 20 | 0} 40 40 color #FFFFFF`);
-      }
-    } else {
-      // gentle default
-      base.push(
-        `circle ${w/2|0} ${h/2|0} 60 color #44AAFF`,
-        `play C4`,
-        `delay 400`,
-        `play E4`,
-        `delay 400`,
-        `play G4`
-      );
-    }
-    return base.join('\n');
   }
 
   // Expose
