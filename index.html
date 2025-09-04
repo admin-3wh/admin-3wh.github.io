@@ -31,47 +31,10 @@
       <h1>Welcome to 3wh.dev</h1>
       <p>This is my personal website — a vestibule for apps, articles, projects, and experiments.</p>
     </section>
-
-    <!-- Example controls for ShapeSound AI integration -->
-    <section class="shapesound-ai">
-      <h2>ShapeSound AI</h2>
-      <input type="text" id="natural-prompt" placeholder="Describe a scene...">
-      <button id="convert-prompt">Generate</button>
-      <textarea id="code" rows="6" cols="60" placeholder="Generated DSL will appear here..."></textarea>
-      <div id="error-box" style="display:none;color:red;margin-top:8px;"></div>
-    </section>
   </main>
   <footer>
     © 2025 3wh.dev. All rights reserved.
   </footer>
-
-  <!-- Load TF.js before TinyGPT -->
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.18.0/dist/tf.min.js"></script>
-  <script src="/projects/shapesound/tinygpt.js"></script>
   <script src="/script.js"></script>
-
-  <!-- Hook Generate button to TinyGPT -->
-  <script>
-    // Example: hook your existing “Generate” button to TinyGPT
-    const btnAI = document.getElementById('convert-prompt');
-    btnAI?.addEventListener('click', async () => {
-      const input = document.getElementById('natural-prompt').value;
-      const codeArea = document.getElementById('code');
-      const status = document.getElementById('error-box');
-
-      status.style.display = 'block';
-      status.textContent = 'Thinking with TinyGPT…';
-
-      try {
-        const dsl = await window.TinyGPT.promptToSceneDSL(input);
-        codeArea.value = dsl;
-        status.textContent = 'Generated!';
-        setTimeout(()=> (status.style.display='none'), 1200);
-      } catch (e) {
-        status.textContent = 'AI generation failed. Check console.';
-        console.error(e);
-      }
-    });
-  </script>
 </body>
 </html>
