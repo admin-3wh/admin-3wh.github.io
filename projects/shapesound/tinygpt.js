@@ -1,32 +1,48 @@
 /* projects/shapesound/tinygpt.js
  * TinyGPT loader + GPT-2 BPE tokenizer + simple generator for ShapeSound
- * Requires TF.js:
- * <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.18.0/dist/tf.min.js"></script>
+ * Requires TF.js (and optional WASM/WebGL backends) loaded in HTML before this file.
  */
 
 (function () {
   // ---------- Remote (HF) + Local fallbacks ----------
-  const HF_REPO  = 'admin-3wh/shapesound-tinygpt';
-  const HF_BASE  = `https://huggingface.co/${HF_REPO}/resolve/main`;
+  const HF_REPO = 'admin-3wh/shapesound-tinygpt';
+  const HF_BASE = `https://huggingface.co/${HF_REPO}/resolve/main`;
   const LOCAL_BASE = '/projects/shapesound/model';
 
-  // Prefer local first (fewer redirects / lower memory) then HF
   const CANDIDATE_MODEL_URLS = [
-    `${LOCAL_BASE}/model.json`,
     `${HF_BASE}/model.json`,
+    `${LOCAL_BASE}/model.json`,
   ];
   const CANDIDATE_TOKENIZER_JSON = [
-    `${LOCAL_BASE}/tokenizer.json`,
     `${HF_BASE}/tokenizer.json`,
+    `${LOCAL_BASE}/tokenizer.json`,
   ];
   const CANDIDATE_VOCAB_URLS = [
-    `${LOCAL_BASE}/vocab.json`,
     `${HF_BASE}/vocab.json`,
+    `${LOCAL_BASE}/vocab.json`,
   ];
   const CANDIDATE_MERGES_URLS = [
-    `${LOCAL_BASE}/merges.txt`,
     `${HF_BASE}/merges.txt`,
+    `${LOCAL_BASE}/merges.txt`,
   ];
+
+  // ===== Backend selection (memory-friendlier) =====
+  async function pickBackend() {
+    // Safari often handles BIG graphs better with WebGL than WASM
+    const ua = navigator.userAgent.toLowerCase();
+    const isSafari = ua.includes('safari') && !ua.includes('chrome');
+    const backends = isSafari ? ['webgl', 'wasm', 'cpu'] : ['wasm', 'webgl', 'cpu'];
+
+    for (const b of backends) {
+      try {
+        await tf.setBackend(b);
+        await tf.ready();
+        console.log('[TinyGPT] Using backend:', tf.getBackend());
+        return;
+      } catch (_) { /* try next */ }
+    }
+    console.warn('[TinyGPT] Could not set webgl/wasm; using default:', tf.getBackend());
+  }
 
   // ===== Utilities =====
   async function fetchJSON(url) {
@@ -100,6 +116,7 @@
     for (let i = 0; i < word.length - 1; i++) pairs.add(word[i] + SEP + word[i + 1]);
     return pairs;
   };
+
   function bpe(token, bpeRanks, cache) {
     if (cache[token]) return cache[token];
     let word = token.split('');
@@ -130,6 +147,7 @@
       if (word.length === 1) break;
       pairs = get_pairs(word);
     }
+
     return (cache[token] = word.join(' '));
   }
 
@@ -212,17 +230,14 @@
     _tokenizer: null,
     _inputNames: null,
     _outputNames: null,
-    _vocabSize: null, // set from tokenizer
 
     async _loadTokenizer() {
       // Prefer tokenizer.json; else vocab+merges
       try {
         const tok = await firstOkJSON(CANDIDATE_TOKENIZER_JSON);
         if (tok?.model?.vocab && tok?.model?.merges) {
-          const vocab  = tok.model.vocab;
+          const vocab = tok.model.vocab;
           const merges = tok.model.merges.join('\n');
-          const ids = Object.values(vocab);
-          this._vocabSize = (ids.length ? Math.max(...ids) + 1 : 50257);
           return new GPT2Tokenizer(vocab, merges);
         }
         throw new Error('Tokenizer JSON incompatible; falling back');
@@ -231,8 +246,6 @@
           firstOkJSON(CANDIDATE_VOCAB_URLS),
           firstOkText(CANDIDATE_MERGES_URLS),
         ]);
-        const ids = Object.values(vocab);
-        this._vocabSize = (ids.length ? Math.max(...ids) + 1 : 50257);
         return new GPT2Tokenizer(vocab, merges);
       }
     },
@@ -251,47 +264,27 @@
 
     _pickLogits(outputs) {
       const arr = Array.isArray(outputs) ? outputs : [outputs];
-      const V = this._vocabSize || 50257;
-
-      // helper: try squeezing to reduce rank (preserve original if squeeze fails)
-      function squeezeTo3D(t) {
-        if (!t) return t;
-        try {
-          const s = t.squeeze();
-          return s.shape.length <= t.shape.length ? s : t;
-        } catch { return t; }
-      }
-
-      // 1) Prefer any output named like "logits" after squeezing
       if (this._model?.outputs?.length) {
         for (let i = 0; i < this._model.outputs.length; i++) {
-          const name = (this._model.outputs[i].name || '').toLowerCase();
-          const t = squeezeTo3D(arr[i]);
-          if (name.includes('logits') && t?.shape?.length === 3) return t;
+          const nm = (this._model.outputs[i].name || '').toLowerCase();
+          const t  = arr[i];
+          if (nm.includes('logits') && t?.shape?.length === 3) return t;
         }
       }
-
-      // 2) Otherwise choose a rank-3 tensor whose last dim matches vocab-ish
-      let best = null;
-      for (const raw of arr) {
-        const t = squeezeTo3D(raw);
-        const s = t?.shape;
-        if (!s || s.length !== 3) continue;
-        const [b, seq, voc] = s;
-        if (b !== 1) continue;
-        if (voc >= Math.max(1000, V - 512) && voc <= V + 512) {
-          if (!best || Math.abs(voc - V) < Math.abs(best.shape[2] - V)) best = t;
+      for (const t of arr) {
+        if (t?.shape?.length === 3) {
+          const [b, s, v] = t.shape;
+          if (b === 1 && v >= 1000) return t;
         }
       }
-      if (best) return best;
-
       const shapes = arr.map(t => t?.shape);
-      throw new Error(`[TinyGPT] Could not find logits. Output shapes: ${JSON.stringify(shapes)}; expected last dim ≈ ${V}`);
+      throw new Error(`[TinyGPT] Could not find logits. Output shapes: ${JSON.stringify(shapes)}`);
     },
 
     async load() {
       if (this._ready) return this._ready;
       this._ready = (async () => {
+        await pickBackend();                // <<< choose a lean backend first
         this._tokenizer = await this._loadTokenizer();
         this._model = await firstOkGraphModel(CANDIDATE_MODEL_URLS);
         const { inputs, outputs } = await this._inferIO(this._model);
@@ -304,79 +297,71 @@
     async generate(prompt, opts = {}) {
       await this.load();
       const {
-        maxNewTokens = 96,
-        temperature  = 0.7,
-        topK         = 40,
-        stopTokens   = [],
+        maxNewTokens = 64,   // down from 96
+        temperature = 0.7,
+        topK = 40,
+        stopTokens = [],
       } = opts;
 
-      const needInputIds = this._expects('input_ids');
-      const needAttnMask = this._expects('attention_mask');
+      const needInputIds  = this._expects('input_ids');
+      const needAttnMask  = this._expects('attention_mask');
 
       let inputIds = this._tokenizer.encode(prompt);
-      const MAX_CTX = 96; // smaller context -> less memory in Safari
+      const MAX_CTX = 128;   // <<< big memory saver
 
       for (let step = 0; step < maxNewTokens; step++) {
-        const ctxIds = inputIds.slice(-MAX_CTX);
-        const seqLen = ctxIds.length;
+        const nextId = await tf.tidy(async () => {
+          const ctxIds = inputIds.slice(-MAX_CTX);
+          const seqLen = ctxIds.length;
 
-        const feed = {};
-        const firstInputName = this._inputNames?.[0];
-        feed[needInputIds ? 'input_ids' : firstInputName] = tf.tensor(ctxIds, [1, seqLen], 'int32');
-        if (needAttnMask) {
-          feed['attention_mask'] = tf.tensor(new Array(seqLen).fill(1), [1, seqLen], 'int32');
-        }
+          const feed = {};
+          const firstInputName = this._inputNames?.[0];
+          feed[needInputIds ? 'input_ids' : firstInputName] = tf.tensor(ctxIds, [1, seqLen], 'int32');
+          if (needAttnMask) feed['attention_mask'] = tf.ones([1, seqLen], 'int32');
 
-        let outputs, logits;
-        try {
-          outputs = this._model.execute(feed);
-          logits  = this._pickLogits(outputs);
-        } catch (e) {
-          Object.values(feed).forEach(t => t.dispose?.());
-          console.error('[TinyGPT] Inference error.\n Provided feeds keys:', Object.keys(feed),
-                        '\n Model expects:', this._inputNames, e);
-          throw e;
-        }
-
-        if (logits.shape.length !== 3) {
-          Object.values(feed).forEach(t => t.dispose?.());
-          logits.dispose?.();
-          throw new Error(`[TinyGPT] Unexpected logits shape ${JSON.stringify(logits.shape)}. Expected [1, seq, vocab].`);
-        }
-
-        const lastLogits = logits
-          .slice([0, logits.shape[1] - 1, 0], [1, 1, logits.shape[2]])
-          .squeeze([0, 1]); // -> [vocab]
-
-        let nextId;
-        if (temperature <= 0) {
-          const { indices } = tf.topk(lastLogits, 1);
-          nextId = (await indices.data())[0];
-          indices.dispose();
-        } else {
-          let l = lastLogits.div(tf.scalar(temperature));
-          if (topK && topK > 0) {
-            const { values, indices } = tf.topk(l, topK);
-            const probs = tf.softmax(values);
-            const probsData = await probs.data();
-            const idx = sampleFromDistribution(probsData);
-            nextId = (await indices.data())[idx];
-            values.dispose(); indices.dispose(); probs.dispose();
-          } else {
-            const probs = tf.softmax(l);
-            const probsData = await probs.data();
-            nextId = sampleFromDistribution(probsData);
-            probs.dispose();
+          let outputs, logits;
+          try {
+            outputs = this._model.execute(feed);      // static graph -> execute()
+            logits  = this._pickLogits(outputs);
+          } catch (e) {
+            Object.values(feed).forEach(t => t.dispose?.());
+            console.error('[TinyGPT] Inference error. Provided feeds:', Object.keys(feed),
+                          'Model expects:', this._inputNames, e);
+            throw e;
           }
-          l.dispose();
-        }
 
-        lastLogits.dispose();
-        logits.dispose?.();
-        Object.values(feed).forEach(t => t.dispose?.());
+          const lastLogits = logits.slice([0, logits.shape[1] - 1, 0], [1, 1, logits.shape[2]]).squeeze([0, 1]);
+
+          if (temperature <= 0) {
+            const { indices } = tf.topk(lastLogits, 1);
+            const id = (await indices.data())[0];
+            indices.dispose();
+            return id;
+          } else {
+            let l = lastLogits.div(tf.scalar(temperature));
+            if (topK && topK > 0) {
+              const { values, indices } = tf.topk(l, topK);
+              const probs = tf.softmax(values);
+              const p = await probs.data();
+              const pick = sampleFromDistribution(p);
+              const id = (await indices.data())[pick];
+              values.dispose(); indices.dispose(); probs.dispose();
+              return id;
+            } else {
+              const probs = tf.softmax(l);
+              const p = await probs.data();
+              const id = sampleFromDistribution(p);
+              probs.dispose();
+              return id;
+            }
+          }
+        });
 
         inputIds.push(nextId);
         if (stopTokens.includes(nextId)) break;
+
+        // Yield to the browser so Safari’s watchdog is happier
+        if ((step & 3) === 3) await new Promise(r => setTimeout(r, 0));
       }
 
       return this._tokenizer.decode(inputIds);
@@ -391,8 +376,7 @@ End sequences with a closing curly brace on its own line.
 `;
       const delim = '\n<SEP>\n';
       const query = `${systemHint}${delim}${userPrompt.trim()}\n${delim}`;
-      const raw = await this.generate(query, { maxNewTokens: 96, temperature: 0.7, topK: 50 });
-
+      const raw = await this.generate(query, { maxNewTokens: 64, temperature: 0.7, topK: 40 });
       const parts = raw.split('<SEP>');
       const candidate = (parts.length > 1 ? parts[parts.length - 1] : raw).trim();
       const cleaned = candidate.replace(/\r/g, '').split('\n\n')[0].trim();
@@ -406,6 +390,5 @@ End sequences with a closing curly brace on its own line.
     return probsArray.length - 1;
   }
 
-  // Expose
   window.TinyGPT = TinyGPT;
 })();
