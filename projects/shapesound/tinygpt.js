@@ -4,27 +4,17 @@
  */
 
 (function () {
+  console.log('[TinyGPT] build v6 (Safari-safe: no tidy, lighter memory)');
+
   // ---------- Remote (HF) + Local fallbacks ----------
-  const HF_REPO = 'admin-3wh/shapesound-tinygpt';
-  const HF_BASE = `https://huggingface.co/${HF_REPO}/resolve/main`;
+  const HF_REPO  = 'admin-3wh/shapesound-tinygpt';
+  const HF_BASE  = `https://huggingface.co/${HF_REPO}/resolve/main`;
   const LOCAL_BASE = '/projects/shapesound/model';
 
-  const CANDIDATE_MODEL_URLS = [
-    `${HF_BASE}/model.json`,
-    `${LOCAL_BASE}/model.json`,
-  ];
-  const CANDIDATE_TOKENIZER_JSON = [
-    `${HF_BASE}/tokenizer.json`,
-    `${LOCAL_BASE}/tokenizer.json`,
-  ];
-  const CANDIDATE_VOCAB_URLS = [
-    `${HF_BASE}/vocab.json`,
-    `${LOCAL_BASE}/vocab.json`,
-  ];
-  const CANDIDATE_MERGES_URLS = [
-    `${HF_BASE}/merges.txt`,
-    `${LOCAL_BASE}/merges.txt`,
-  ];
+  const CANDIDATE_MODEL_URLS     = [`${HF_BASE}/model.json`, `${LOCAL_BASE}/model.json`];
+  const CANDIDATE_TOKENIZER_JSON = [`${HF_BASE}/tokenizer.json`, `${LOCAL_BASE}/tokenizer.json`];
+  const CANDIDATE_VOCAB_URLS     = [`${HF_BASE}/vocab.json`, `${LOCAL_BASE}/vocab.json`];
+  const CANDIDATE_MERGES_URLS    = [`${HF_BASE}/merges.txt`, `${LOCAL_BASE}/merges.txt`];
 
   // ===== Backend selection (memory-friendlier) =====
   async function pickBackend() {
@@ -32,8 +22,12 @@
     const isSafari = ua.includes('safari') && !ua.includes('chrome');
     const backends = isSafari ? ['webgl', 'wasm', 'cpu'] : ['wasm', 'webgl', 'cpu'];
     for (const b of backends) {
-      try { await tf.setBackend(b); await tf.ready(); console.log('[TinyGPT] Using backend:', tf.getBackend()); return; }
-      catch { /* try next */ }
+      try {
+        await tf.setBackend(b);
+        await tf.ready();
+        console.log('[TinyGPT] Using backend:', tf.getBackend());
+        return;
+      } catch { /* try next */ }
     }
     console.warn('[TinyGPT] Could not set webgl/wasm; using default:', tf.getBackend());
   }
@@ -205,10 +199,12 @@
       return { inputs, outputs };
     },
 
-    _expects(name) { return (this._inputNames || []).some(n => n === name); },
+    _expects(name) { return (this._inputNames || []).includes(name); },
 
     _pickLogits(outputs) {
       const arr = Array.isArray(outputs) ? outputs : [outputs];
+
+      // Prefer any named output containing "logits"
       if (this._model?.outputs?.length) {
         for (let i = 0; i < this._model.outputs.length; i++) {
           const nm = (this._model.outputs[i].name || '').toLowerCase();
@@ -216,12 +212,16 @@
           if (nm.includes('logits') && t?.shape?.length === 3) return t;
         }
       }
+      // Otherwise pick a likely logits: [1, seq, vocab] with reasonable vocab size
       for (const t of arr) {
         if (t?.shape?.length === 3) {
           const [b, s, v] = t.shape;
-          if (b === 1 && v >= 1000) return t;
+          if (b === 1 && v >= 1000 && v <= 100000) return t;
         }
       }
+      // Fall back to first rank-3 tensor
+      for (const t of arr) if (t?.shape?.length === 3) return t;
+
       const shapes = arr.map(t => t?.shape);
       throw new Error(`[TinyGPT] Could not find logits. Output shapes: ${JSON.stringify(shapes)}`);
     },
@@ -242,7 +242,7 @@
     async generate(prompt, opts = {}) {
       await this.load();
       const {
-        maxNewTokens = 64,
+        maxNewTokens = 48,         // ↓ a bit lower for Safari
         temperature  = 0.7,
         topK         = 40,
         stopTokens   = [],
@@ -252,7 +252,7 @@
       const needAttnMask = this._expects('attention_mask');
 
       let inputIds = this._tokenizer.encode(prompt);
-      const MAX_CTX = 128;
+      const MAX_CTX = 96;          // ↓ lower context helps memory
 
       for (let step = 0; step < maxNewTokens; step++) {
         const ctxIds = inputIds.slice(-MAX_CTX);
@@ -283,7 +283,7 @@
             if (topK && topK > 0) {
               const { values, indices } = tf.topk(l, topK);
               const probs = tf.softmax(values);
-              const p = probs.dataSync();                       // sync read
+              const p = probs.dataSync();                 // sync read (no tidy)
               const pick = sampleFromDistribution(p);
               nextId = indices.dataSync()[pick];
               values.dispose(); indices.dispose(); probs.dispose();
@@ -300,7 +300,6 @@
         } catch (e) {
           console.error('[TinyGPT] Inference error. Provided feeds:', Object.keys(feed),
                         'Model expects:', this._inputNames, e);
-          // Clean up before rethrow
           Object.values(feed).forEach(t => t.dispose?.());
           logits?.dispose?.();
           throw e;
@@ -330,7 +329,8 @@ End sequences with a closing curly brace on its own line.
 `;
       const delim = '\n<SEP>\n';
       const query = `${systemHint}${delim}${userPrompt.trim()}\n${delim}`;
-      const raw = await this.generate(query, { maxNewTokens: 64, temperature: 0.7, topK: 40 });
+      const raw = await this.generate(query, { maxNewTokens: 48, temperature: 0.7, topK: 40 });
+
       const parts = raw.split('<SEP>');
       const candidate = (parts.length > 1 ? parts[parts.length - 1] : raw).trim();
       const cleaned = candidate.replace(/\r/g, '').split('\n\n')[0].trim();
@@ -338,7 +338,7 @@ End sequences with a closing curly brace on its own line.
     }
   };
 
-  function sampleFromDistribution(probsArray /* Float32Array|number[] */) {
+  function sampleFromDistribution(probsArray) {
     let r = Math.random();
     for (let i = 0; i < probsArray.length; i++) { r -= probsArray[i]; if (r <= 0) return i; }
     return probsArray.length - 1;
