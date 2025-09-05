@@ -28,61 +28,28 @@
 
   // ===== Backend selection (memory-friendlier) =====
   async function pickBackend() {
-    // Safari often handles BIG graphs better with WebGL than WASM
     const ua = navigator.userAgent.toLowerCase();
     const isSafari = ua.includes('safari') && !ua.includes('chrome');
     const backends = isSafari ? ['webgl', 'wasm', 'cpu'] : ['wasm', 'webgl', 'cpu'];
-
     for (const b of backends) {
-      try {
-        await tf.setBackend(b);
-        await tf.ready();
-        console.log('[TinyGPT] Using backend:', tf.getBackend());
-        return;
-      } catch (_) { /* try next */ }
+      try { await tf.setBackend(b); await tf.ready(); console.log('[TinyGPT] Using backend:', tf.getBackend()); return; }
+      catch { /* try next */ }
     }
     console.warn('[TinyGPT] Could not set webgl/wasm; using default:', tf.getBackend());
   }
 
-  // ===== Utilities =====
-  async function fetchJSON(url) {
-    const r = await fetch(url, { cache: 'no-store' });
-    if (!r.ok) throw new Error(`fetch failed: ${url} ${r.status}`);
-    return r.json();
-  }
-  async function fetchText(url) {
-    const r = await fetch(url, { cache: 'no-store' });
-    if (!r.ok) throw new Error(`fetch failed: ${url} ${r.status}`);
-    return r.text();
-  }
-  async function firstOkJSON(urls) {
-    let lastErr;
+  // ===== HTTP helpers =====
+  async function fetchJSON(url) { const r = await fetch(url, { cache: 'no-store' }); if (!r.ok) throw new Error(`fetch failed: ${url} ${r.status}`); return r.json(); }
+  async function fetchText(url) { const r = await fetch(url, { cache: 'no-store' }); if (!r.ok) throw new Error(`fetch failed: ${url} ${r.status}`); return r.text(); }
+  async function firstOkJSON(urls){ let e; for(const u of urls){ try{ return await fetchJSON(u);}catch(err){e=err;} } throw e||new Error('No JSON'); }
+  async function firstOkText(urls){ let e; for(const u of urls){ try{ return await fetchText(u);}catch(err){e=err;} } throw e||new Error('No text'); }
+  async function firstOkGraphModel(urls){
+    let e;
     for (const u of urls) {
-      try { return await fetchJSON(u); } catch (e) { lastErr = e; }
+      try { console.log('[TinyGPT] Trying model:', u); const m = await tf.loadGraphModel(u); console.log('[TinyGPT] Loaded model:', u); return m; }
+      catch(err){ console.warn('[TinyGPT] Failed model URL:', u, err); e=err; }
     }
-    throw lastErr || new Error('No JSON source succeeded');
-  }
-  async function firstOkText(urls) {
-    let lastErr;
-    for (const u of urls) {
-      try { return await fetchText(u); } catch (e) { lastErr = e; }
-    }
-    throw lastErr || new Error('No text source succeeded');
-  }
-  async function firstOkGraphModel(urls) {
-    let lastErr;
-    for (const u of urls) {
-      try {
-        console.log('[TinyGPT] Trying model:', u);
-        const m = await tf.loadGraphModel(u);
-        console.log('[TinyGPT] Loaded model:', u);
-        return m;
-      } catch (e) {
-        console.warn('[TinyGPT] Failed model URL:', u, e);
-        lastErr = e;
-      }
-    }
-    throw lastErr || new Error('No model source succeeded');
+    throw e||new Error('No model');
   }
 
   // ===== GPT-2 byte encoder/decoder =====
@@ -111,56 +78,37 @@
 
   // ===== BPE =====
   const SEP = '\u0000';
-  const get_pairs = (word) => {
-    const pairs = new Set();
-    for (let i = 0; i < word.length - 1; i++) pairs.add(word[i] + SEP + word[i + 1]);
-    return pairs;
-  };
+  const get_pairs = (word) => { const pairs = new Set(); for (let i = 0; i < word.length - 1; i++) pairs.add(word[i] + SEP + word[i + 1]); return pairs; };
 
   function bpe(token, bpeRanks, cache) {
     if (cache[token]) return cache[token];
-    let word = token.split('');
-    if (word.length === 1) return token;
+    let word = token.split(''); if (word.length === 1) return token;
     let pairs = get_pairs(word);
-
     while (true) {
       let minPair = null, minRank = Infinity;
-      for (const p of pairs) {
-        const [a, b] = p.split(SEP);
-        const r = bpeRanks[a + ' ' + b];
-        if (r !== undefined && r < minRank) { minRank = r; minPair = [a, b]; }
-      }
+      for (const p of pairs) { const [a,b]=p.split(SEP); const r=bpeRanks[a+' '+b]; if (r!==undefined && r<minRank){minRank=r; minPair=[a,b];} }
       if (!minPair) break;
-
-      const [first, second] = minPair;
-      const newWord = [];
-      for (let i = 0; i < word.length; ) {
+      const [first, second] = minPair; const newWord = [];
+      for (let i=0;i<word.length;) {
         const j = word.indexOf(first, i);
         if (j === -1) { newWord.push(...word.slice(i)); break; }
-        newWord.push(...word.slice(i, j));
-        i = j;
-        if (i < word.length - 1 && word[i] === first && word[i + 1] === second) {
-          newWord.push(first + second); i += 2;
-        } else { newWord.push(word[i]); i += 1; }
+        newWord.push(...word.slice(i, j)); i = j;
+        if (i < word.length - 1 && word[i] === first && word[i + 1] === second) { newWord.push(first + second); i += 2; }
+        else { newWord.push(word[i]); i += 1; }
       }
-      word = newWord;
-      if (word.length === 1) break;
-      pairs = get_pairs(word);
+      word = newWord; if (word.length === 1) break; pairs = get_pairs(word);
     }
-
     return (cache[token] = word.join(' '));
   }
 
   // ===== Tokenizer =====
   class GPT2Tokenizer {
     constructor(vocab, merges) {
-      this.encoder = vocab;                  // token -> id
+      this.encoder = vocab;
       this.decoder = {};
       for (const [k, v] of Object.entries(vocab)) this.decoder[v] = k;
-
       const mergesList = merges.split('\n').filter(l => l && !l.startsWith('#')).map(l => l.trim());
-      this.bpeRanks = {};
-      mergesList.forEach((m, i) => { this.bpeRanks[m] = i; });
+      this.bpeRanks = {}; mergesList.forEach((m, i) => { this.bpeRanks[m] = i; });
       this.cache = {};
     }
     encode(text) {
@@ -175,11 +123,11 @@
       return out;
     }
     decode(tokens) {
-      const text = tokens.map(t => this.decoder[t] ?? '')
+      const bytes = tokens.map(t => this.decoder[t] ?? '')
         .join('')
         .split('')
         .map(ch => unicodeToByte[ch.charCodeAt(0)] ?? 32);
-      return bytes_to_text(text);
+      return bytes_to_text(bytes);
     }
   }
 
@@ -232,7 +180,6 @@
     _outputNames: null,
 
     async _loadTokenizer() {
-      // Prefer tokenizer.json; else vocab+merges
       try {
         const tok = await firstOkJSON(CANDIDATE_TOKENIZER_JSON);
         if (tok?.model?.vocab && tok?.model?.merges) {
@@ -258,9 +205,7 @@
       return { inputs, outputs };
     },
 
-    _expects(name) {
-      return (this._inputNames || []).some(n => n === name);
-    },
+    _expects(name) { return (this._inputNames || []).some(n => n === name); },
 
     _pickLogits(outputs) {
       const arr = Array.isArray(outputs) ? outputs : [outputs];
@@ -284,7 +229,7 @@
     async load() {
       if (this._ready) return this._ready;
       this._ready = (async () => {
-        await pickBackend();                // <<< choose a lean backend first
+        await pickBackend();
         this._tokenizer = await this._loadTokenizer();
         this._model = await firstOkGraphModel(CANDIDATE_MODEL_URLS);
         const { inputs, outputs } = await this._inferIO(this._model);
@@ -297,70 +242,79 @@
     async generate(prompt, opts = {}) {
       await this.load();
       const {
-        maxNewTokens = 64,   // down from 96
-        temperature = 0.7,
-        topK = 40,
-        stopTokens = [],
+        maxNewTokens = 64,
+        temperature  = 0.7,
+        topK         = 40,
+        stopTokens   = [],
       } = opts;
 
-      const needInputIds  = this._expects('input_ids');
-      const needAttnMask  = this._expects('attention_mask');
+      const needInputIds = this._expects('input_ids');
+      const needAttnMask = this._expects('attention_mask');
 
       let inputIds = this._tokenizer.encode(prompt);
-      const MAX_CTX = 128;   // <<< big memory saver
+      const MAX_CTX = 128;
 
       for (let step = 0; step < maxNewTokens; step++) {
-        const nextId = await tf.tidy(async () => {
-          const ctxIds = inputIds.slice(-MAX_CTX);
-          const seqLen = ctxIds.length;
+        const ctxIds = inputIds.slice(-MAX_CTX);
+        const seqLen = ctxIds.length;
 
-          const feed = {};
-          const firstInputName = this._inputNames?.[0];
-          feed[needInputIds ? 'input_ids' : firstInputName] = tf.tensor(ctxIds, [1, seqLen], 'int32');
-          if (needAttnMask) feed['attention_mask'] = tf.ones([1, seqLen], 'int32');
+        // Build feed
+        const feed = {};
+        const firstInputName = this._inputNames?.[0];
+        feed[needInputIds ? 'input_ids' : firstInputName] = tf.tensor(ctxIds, [1, seqLen], 'int32');
+        if (needAttnMask) feed['attention_mask'] = tf.ones([1, seqLen], 'int32');
 
-          let outputs, logits;
-          try {
-            outputs = this._model.execute(feed);      // static graph -> execute()
-            logits  = this._pickLogits(outputs);
-          } catch (e) {
-            Object.values(feed).forEach(t => t.dispose?.());
-            console.error('[TinyGPT] Inference error. Provided feeds:', Object.keys(feed),
-                          'Model expects:', this._inputNames, e);
-            throw e;
-          }
+        let outputs, logits, nextId;
+        try {
+          outputs = this._model.execute(feed);    // static graph → execute()
+          logits  = this._pickLogits(outputs);
 
-          const lastLogits = logits.slice([0, logits.shape[1] - 1, 0], [1, 1, logits.shape[2]]).squeeze([0, 1]);
+          // last token logits → shape [vocab]
+          const lastLogits = logits
+            .slice([0, logits.shape[1] - 1, 0], [1, 1, logits.shape[2]])
+            .squeeze([0, 1]);
 
           if (temperature <= 0) {
             const { indices } = tf.topk(lastLogits, 1);
-            const id = (await indices.data())[0];
+            nextId = indices.dataSync()[0];
             indices.dispose();
-            return id;
           } else {
             let l = lastLogits.div(tf.scalar(temperature));
             if (topK && topK > 0) {
               const { values, indices } = tf.topk(l, topK);
               const probs = tf.softmax(values);
-              const p = await probs.data();
+              const p = probs.dataSync();                       // sync read
               const pick = sampleFromDistribution(p);
-              const id = (await indices.data())[pick];
+              nextId = indices.dataSync()[pick];
               values.dispose(); indices.dispose(); probs.dispose();
-              return id;
             } else {
               const probs = tf.softmax(l);
-              const p = await probs.data();
-              const id = sampleFromDistribution(p);
+              const p = probs.dataSync();
+              nextId = sampleFromDistribution(p);
               probs.dispose();
-              return id;
             }
+            l.dispose();
           }
-        });
 
+          lastLogits.dispose();
+        } catch (e) {
+          console.error('[TinyGPT] Inference error. Provided feeds:', Object.keys(feed),
+                        'Model expects:', this._inputNames, e);
+          // Clean up before rethrow
+          Object.values(feed).forEach(t => t.dispose?.());
+          logits?.dispose?.();
+          throw e;
+        }
+
+        // Dispose per-step tensors
+        Object.values(feed).forEach(t => t.dispose?.());
+        logits?.dispose?.();
+
+        // Append token
         inputIds.push(nextId);
         if (stopTokens.includes(nextId)) break;
 
-        // Yield to the browser so Safari’s watchdog is happier
+        // Give the browser a breath
         if ((step & 3) === 3) await new Promise(r => setTimeout(r, 0));
       }
 
@@ -384,7 +338,7 @@ End sequences with a closing curly brace on its own line.
     }
   };
 
-  function sampleFromDistribution(probsArray) {
+  function sampleFromDistribution(probsArray /* Float32Array|number[] */) {
     let r = Math.random();
     for (let i = 0; i < probsArray.length; i++) { r -= probsArray[i]; if (r <= 0) return i; }
     return probsArray.length - 1;
