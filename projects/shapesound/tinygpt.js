@@ -67,140 +67,97 @@
     throw lastErr || new Error('No model source succeeded');
   }
 
-  // ===== GPT-2 Byte encoder/decoder =====
+  // ===== GPT-2 byte encoder/decoder =====
   function bytes_to_unicode() {
-    // canonical GPT-2 byte<->unicode maps
-    let bs = [];
-    let cs = [];
+    let bs = [], cs = [];
     for (let i = 33; i < 127; i++) bs.push(i);
     for (let i = 161; i < 173; i++) bs.push(i);
     for (let i = 174; i < 256; i++) bs.push(i);
-    let n = 0;
-    for (let b = 0; b < 256; b++) {
-      if (!bs.includes(b)) {
-        bs.push(b);
-        cs.push(256 + n);
-        n++;
-      }
-    }
-    const byteToUnicode = {};
-    const unicodeToByte = {};
+    for (let b = 0, n = 0; b < 256; b++) if (!bs.includes(b)) { bs.push(b); cs.push(256 + n++); }
+    const byteToUnicode = {}, unicodeToByte = {};
     for (let i = 0; i < bs.length; i++) {
-      const b = bs[i];
-      const c = i < 256 ? b : cs[i - 256];
+      const b = bs[i], c = i < 256 ? b : cs[i - 256];
       byteToUnicode[b] = String.fromCharCode(c);
       unicodeToByte[String.fromCharCode(c)] = b;
     }
     return { byteToUnicode, unicodeToByte };
   }
   const { byteToUnicode, unicodeToByte } = bytes_to_unicode();
+  const enc = new TextEncoder(), dec = new TextDecoder();
+  const text_to_bytes = (t) => Array.from(enc.encode(t));
+  const bytes_to_text = (b) => dec.decode(new Uint8Array(b));
 
-  function text_to_bytes(text) {
-    const utf8 = new TextEncoder().encode(text);
-    return Array.from(utf8);
-  }
-  function bytes_to_text(bytes) {
-    return new TextDecoder().decode(new Uint8Array(bytes));
-  }
-
-  // GPT-2 regex for token splitting
+  // GPT-2 token regex
   // eslint-disable-next-line no-useless-escape
   const GPT2_SPLIT_RE = /'s|'t|'re|'ve|'m|'ll|'d| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+/gu;
 
   // ===== BPE =====
-  function get_pairs(word) {
+  const SEP = '\u0000';
+  const get_pairs = (word) => {
     const pairs = new Set();
-    for (let i = 0; i < word.length - 1; i++) {
-      pairs.add(word[i] + '\u0000' + word[i + 1]);
-    }
+    for (let i = 0; i < word.length - 1; i++) pairs.add(word[i] + SEP + word[i + 1]);
     return pairs;
-  }
+  };
 
   function bpe(token, bpeRanks, cache) {
     if (cache[token]) return cache[token];
     let word = token.split('');
     if (word.length === 1) return token;
-
     let pairs = get_pairs(word);
+
     while (true) {
-      let minPair = null;
-      let minRank = Infinity;
+      let minPair = null, minRank = Infinity;
       for (const p of pairs) {
-        const [a, b] = p.split('\u0000');
-        const rank = bpeRanks[a + ' ' + b];
-        if (rank !== undefined && rank < minRank) {
-          minRank = rank;
-          minPair = [a, b];
-        }
+        const [a, b] = p.split(SEP);
+        const r = bpeRanks[a + ' ' + b];
+        if (r !== undefined && r < minRank) { minRank = r; minPair = [a, b]; }
       }
-      if (minPair == null) break;
+      if (!minPair) break;
 
       const [first, second] = minPair;
       const newWord = [];
-      let i = 0;
-      while (i < word.length) {
+      for (let i = 0; i < word.length; ) {
         const j = word.indexOf(first, i);
-        if (j === -1) {
-          newWord.push(...word.slice(i));
-          break;
-        }
+        if (j === -1) { newWord.push(...word.slice(i)); break; }
         newWord.push(...word.slice(i, j));
         i = j;
-
         if (i < word.length - 1 && word[i] === first && word[i + 1] === second) {
-          newWord.push(first + second);
-          i += 2;
-        } else {
-          newWord.push(word[i]);
-          i += 1;
-        }
+          newWord.push(first + second); i += 2;
+        } else { newWord.push(word[i]); i += 1; }
       }
       word = newWord;
       if (word.length === 1) break;
       pairs = get_pairs(word);
     }
 
-    const result = word.join(' ');
-    cache[token] = result;
-    return result;
+    return (cache[token] = word.join(' '));
   }
 
-  // ===== Tokenizer (GPT-2) =====
+  // ===== Tokenizer =====
   class GPT2Tokenizer {
     constructor(vocab, merges) {
-      this.encoder = vocab; // token string -> id
+      this.encoder = vocab;                  // token -> id
       this.decoder = {};
       for (const [k, v] of Object.entries(vocab)) this.decoder[v] = k;
 
-      const mergesList = merges
-        .split('\n')
-        .filter(l => l && !l.startsWith('#'))
-        .map(l => l.trim());
-
+      const mergesList = merges.split('\n').filter(l => l && !l.startsWith('#')).map(l => l.trim());
       this.bpeRanks = {};
       mergesList.forEach((m, i) => { this.bpeRanks[m] = i; });
-
       this.cache = {};
     }
-
     encode(text) {
-      const bpeTokens = [];
-      const matches = text.match(GPT2_SPLIT_RE) || [];
-      for (const token of matches) {
-        const tokenBytes = text_to_bytes(token).map(b => byteToUnicode[b]).join('');
+      const out = [];
+      const parts = text.match(GPT2_SPLIT_RE) || [];
+      for (const tok of parts) {
+        const tokenBytes = text_to_bytes(tok).map(b => byteToUnicode[b]).join('');
         const bpeStr = bpe(tokenBytes, this.bpeRanks, this.cache);
-        const toks = bpeStr.split(' ').map(t => {
-          if (!(t in this.encoder)) return this.encoder['<|unk|>'] ?? 0;
-          return this.encoder[t];
-        });
-        bpeTokens.push(...toks);
+        const ids = bpeStr.split(' ').map(t => (t in this.encoder) ? this.encoder[t] : (this.encoder['<|unk|>'] ?? 0));
+        out.push(...ids);
       }
-      return bpeTokens;
+      return out;
     }
-
     decode(tokens) {
-      const text = tokens
-        .map(t => this.decoder[t] ?? '')
+      const text = tokens.map(t => this.decoder[t] ?? '')
         .join('')
         .split('')
         .map(ch => unicodeToByte[ch.charCodeAt(0)] ?? 32);
@@ -208,35 +165,26 @@
     }
   }
 
-  // ===== DSL validator (very lightweight) =====
+  // ===== DSL quick validation =====
   function isValidDSL(dsl) {
     if (!dsl || typeof dsl !== 'string') return false;
     const lines = dsl.split('\n').map(l => l.trim()).filter(Boolean);
-    if (lines.length === 0) return false;
-
+    if (!lines.length) return false;
     const cmdRe = /^(canvas|background|tempo|circle|rect|line|sound|play|sequence|animate|delay|sprite)\b/;
-
-    let seqDepth = 0;
+    let depth = 0;
     for (const line of lines) {
-      if (line.startsWith('sequence')) { seqDepth++; continue; }
-      if (line === '}' && seqDepth > 0) { seqDepth--; continue; }
+      if (line.startsWith('sequence')) { depth++; continue; }
+      if (line === '}' && depth > 0) { depth--; continue; }
       if (!cmdRe.test(line) && line !== '}') return false;
     }
-    if (seqDepth !== 0) return false;
-    const hasRenderable = lines.some(l =>
-      /^(circle|rect|line|sprite|animate|background|play|sound|sequence)/.test(l)
-    );
-    return hasRenderable;
+    if (depth !== 0) return false;
+    return lines.some(l => /^(circle|rect|line|sprite|animate|background|play|sound|sequence)/.test(l));
   }
 
-  // ===== Fallback scaffold =====
+  // ===== Fallback when validation fails =====
   function fallbackFromPrompt(prompt) {
     const w = 800, h = 600;
-    const base = [
-      `canvas ${w} ${h}`,
-      `background #001122`,
-      `tempo 90`,
-    ];
+    const base = [`canvas ${w} ${h}`, `background #001122`, `tempo 90`];
     if (/turtle/i.test(prompt)) {
       base.push(
         `sprite turtle crawling x=60 y=540 scale=1`,
@@ -247,17 +195,11 @@
       const m = prompt.match(/(\d+)/);
       const count = Math.max(1, Math.min(10, parseInt(m?.[1] || '4', 10)));
       const spacing = Math.floor(w / (count + 1));
-      for (let i = 0; i < count; i++) {
-        base.push(`rect ${spacing * (i + 1) - 20} ${(h/2 - 20) | 0} 40 40 color #FFFFFF`);
-      }
+      for (let i = 0; i < count; i++) base.push(`rect ${spacing * (i + 1) - 20} ${(h/2 - 20)|0} 40 40 color #FFFFFF`);
     } else {
       base.push(
         `circle ${(w/2)|0} ${(h/2)|0} 60 color #44AAFF`,
-        `play C4`,
-        `delay 400`,
-        `play E4`,
-        `delay 400`,
-        `play G4`
+        `play C4`, `delay 400`, `play E4`, `delay 400`, `play G4`
       );
     }
     return base.join('\n');
@@ -268,10 +210,11 @@
     _ready: null,
     _model: null,
     _tokenizer: null,
-    _keys: null, // {inputIdsKey, attnMaskKey, outputKey}
+    _inputNames: null,
+    _outputNames: null,
 
     async _loadTokenizer() {
-      // Try tokenizer.json (HF or local). If not present, fall back to vocab+merges.
+      // Prefer tokenizer.json; else vocab+merges
       try {
         const tok = await firstOkJSON(CANDIDATE_TOKENIZER_JSON);
         if (tok?.model?.vocab && tok?.model?.merges) {
@@ -279,8 +222,7 @@
           const merges = tok.model.merges.join('\n');
           return new GPT2Tokenizer(vocab, merges);
         }
-        console.warn('[TinyGPT] tokenizer.json present but not GPT-2 BPE shape; falling back to vocab+merges.');
-        throw new Error('Tokenizer JSON incompatible');
+        throw new Error('Tokenizer JSON incompatible; falling back');
       } catch {
         const [vocab, merges] = await Promise.all([
           firstOkJSON(CANDIDATE_VOCAB_URLS),
@@ -290,27 +232,38 @@
       }
     },
 
-    _scanKeys(model) {
-      const inputs = model.inputs.map(t => t.name);
-      const outputs = model.outputs.map(t => t.name);
+    async _inferIO(model) {
+      const inputs  = (model.inputs  || []).map(i => i.name);
+      const outputs = (model.outputs || []).map(o => o.name);
+      console.log('[TinyGPT] Model inputs:', inputs);
+      console.log('[TinyGPT] Model outputs:', outputs);
+      return { inputs, outputs };
+    },
 
-      // Prefer canonical names; otherwise fall back to heuristics
-      const inputIdsKey =
-        inputs.find(n => /(^|\/)input_ids(:0)?$/i.test(n)) ||
-        inputs.find(n => /input.*ids/i.test(n)) ||
-        inputs[0];
+    _expects(name) {
+      return (this._inputNames || []).some(n => n === name);
+    },
 
-      const attnMaskKey =
-        inputs.find(n => /(^|\/)attention_mask(:0)?$/i.test(n)) ||
-        inputs.find(n => /attn.*mask/i.test(n)) ||
-        null;
+    _pickLogits(outputs) {
+      const arr = Array.isArray(outputs) ? outputs : [outputs];
 
-      const outputKey = outputs[0];
-
-      console.log('[TinyGPT] IO keys:', { inputIdsKey, attnMaskKey, outputKey, allInputs: inputs, allOutputs: outputs });
-      if (!inputIdsKey) throw new Error('[TinyGPT] Could not find an input_ids tensor name.');
-      if (!outputKey) throw new Error('[TinyGPT] Could not find an output tensor.');
-      return { inputIdsKey, attnMaskKey, outputKey };
+      // 1) Prefer any named output containing "logits"
+      if (this._model?.outputs?.length) {
+        for (let i = 0; i < this._model.outputs.length; i++) {
+          const nm = (this._model.outputs[i].name || '').toLowerCase();
+          const t  = arr[i];
+          if (nm.includes('logits') && t?.shape?.length === 3) return t;
+        }
+      }
+      // 2) Otherwise pick any rank-3 [1, seq, vocab] tensor
+      for (const t of arr) {
+        if (t?.shape?.length === 3) {
+          const [b, s, v] = t.shape;
+          if (b === 1 && v >= 1000) return t;
+        }
+      }
+      const shapes = arr.map(t => t?.shape);
+      throw new Error(`[TinyGPT] Could not find logits. Output shapes: ${JSON.stringify(shapes)}`);
     },
 
     async load() {
@@ -318,14 +271,13 @@
       this._ready = (async () => {
         this._tokenizer = await this._loadTokenizer();
         this._model = await firstOkGraphModel(CANDIDATE_MODEL_URLS);
-        this._keys = this._scanKeys(this._model);
+        const { inputs, outputs } = await this._inferIO(this._model);
+        this._inputNames = inputs;
+        this._outputNames = outputs;
       })();
       return this._ready;
     },
 
-    /**
-     * Generate text with greedy or top-k sampling
-     */
     async generate(prompt, opts = {}) {
       await this.load();
       const {
@@ -335,35 +287,45 @@
         stopTokens = [],
       } = opts;
 
-      const { inputIdsKey, attnMaskKey, outputKey } = this._keys;
+      const needInputIds  = this._expects('input_ids');
+      const needAttnMask  = this._expects('attention_mask');
 
       let inputIds = this._tokenizer.encode(prompt);
       const MAX_CTX = 512;
 
       for (let step = 0; step < maxNewTokens; step++) {
         const ctxIds = inputIds.slice(-MAX_CTX);
-        const x = tf.tensor(ctxIds, [1, ctxIds.length], 'int32');
-        const mask = attnMaskKey ? tf.onesLike(x, 'int32') : null;
+        const seqLen = ctxIds.length;
 
-        let logits;
+        // Build feed map by real input names, or fall back to first input
+        const feed = {};
+        const firstInputName = this._inputNames?.[0];
+        feed[needInputIds ? 'input_ids' : firstInputName] = tf.tensor(ctxIds, [1, seqLen], 'int32');
+        if (needAttnMask) {
+          feed['attention_mask'] = tf.tensor(new Array(seqLen).fill(1), [1, seqLen], 'int32');
+        }
+
+        let outputs, logits;
         try {
-          const feeds = attnMaskKey ? { [inputIdsKey]: x, [attnMaskKey]: mask } : { [inputIdsKey]: x };
-          const out = (this._model.executeAsync
-            ? await this._model.executeAsync(feeds)
-            : this._model.execute(feeds));
-          logits = Array.isArray(out) ? out[0] : out;
-
-          if (!logits || logits.shape.length !== 3) {
-            throw new Error(`[TinyGPT] Unexpected logits shape ${JSON.stringify(logits?.shape)}. Expected [1, seq, vocab].`);
-          }
+          // Graph seems static → execute() is fine
+          outputs = this._model.execute(feed);
+          logits = this._pickLogits(outputs);
         } catch (e) {
-          x.dispose(); mask?.dispose?.();
-          console.error('[TinyGPT] Inference error.\n Provided feeds keys:', Object.keys(attnMaskKey ? { [inputIdsKey]: 1, [attnMaskKey]: 1 } : { [inputIdsKey]: 1 }),
-                        '\n Model expects:', this._model.inputs.map(t => t.name));
+          Object.values(feed).forEach(t => t.dispose?.());
+          console.error('[TinyGPT] Inference error.\n Provided feeds keys:', Object.keys(feed),
+                        '\n Model expects:', this._inputNames, e);
           throw e;
         }
 
-        const lastLogits = logits.slice([0, logits.shape[1] - 1, 0], [1, 1, logits.shape[2]]).squeeze([0, 1]);
+        if (logits.shape.length !== 3) {
+          Object.values(feed).forEach(t => t.dispose?.());
+          logits.dispose?.();
+          throw new Error(`[TinyGPT] Unexpected logits shape ${JSON.stringify(logits.shape)}. Expected [1, seq, vocab].`);
+        }
+
+        const lastLogits = logits
+          .slice([0, logits.shape[1] - 1, 0], [1, 1, logits.shape[2]])
+          .squeeze([0, 1]); // -> [vocab]
 
         let nextId;
         if (temperature <= 0) {
@@ -371,27 +333,26 @@
           nextId = (await indices.data())[0];
           indices.dispose();
         } else {
-          let l = lastLogits.div(tf.scalar(temperature));
+          let logitsAdj = lastLogits.div(tf.scalar(temperature));
           if (topK && topK > 0) {
-            const { values, indices } = tf.topk(l, topK);
+            const { values, indices } = tf.topk(logitsAdj, topK);
             const probs = tf.softmax(values);
             const probsData = await probs.data();
             const idx = sampleFromDistribution(probsData);
             nextId = (await indices.data())[idx];
             values.dispose(); indices.dispose(); probs.dispose();
           } else {
-            const probs = tf.softmax(l);
+            const probs = tf.softmax(logitsAdj);
             const probsData = await probs.data();
             nextId = sampleFromDistribution(probsData);
             probs.dispose();
           }
-          l.dispose();
+          logitsAdj.dispose();
         }
 
         lastLogits.dispose();
         logits.dispose?.();
-        x.dispose();
-        mask?.dispose?.();
+        Object.values(feed).forEach(t => t.dispose?.());
 
         inputIds.push(nextId);
         if (stopTokens.includes(nextId)) break;
@@ -400,10 +361,6 @@
       return this._tokenizer.decode(inputIds);
     },
 
-    /**
-     * High-level helper used by your UI.
-     * It nudges the model to output ONLY ShapeSound DSL.
-     */
     async promptToSceneDSL(userPrompt) {
       const systemHint =
 `You are TinyGPT that outputs ONLY ShapeSound DSL without commentary.
@@ -411,35 +368,20 @@ Respond with STRICT DSL lines. Do NOT include JSON, quotes, or explanations.
 Use these commands only: canvas, background, tempo, circle, rect, line, sound, play, sequence { ... }, animate, delay, sprite.
 End sequences with a closing curly brace on its own line.
 `;
-
       const delim = '\n<SEP>\n';
       const query = `${systemHint}${delim}${userPrompt.trim()}\n${delim}`;
-      const raw = await this.generate(query, {
-        maxNewTokens: 192,
-        temperature: 0.7,
-        topK: 50,
-      });
+      const raw = await this.generate(query, { maxNewTokens: 192, temperature: 0.7, topK: 50 });
 
       const parts = raw.split('<SEP>');
       const candidate = (parts.length > 1 ? parts[parts.length - 1] : raw).trim();
-
-      const cleaned = candidate
-        .replace(/\r/g, '')
-        .split('\n\n')[0]
-        .trim();
-
-      if (isValidDSL(cleaned)) return cleaned;
-
-      return fallbackFromPrompt(userPrompt);
+      const cleaned = candidate.replace(/\r/g, '').split('\n\n')[0].trim();
+      return isValidDSL(cleaned) ? cleaned : fallbackFromPrompt(userPrompt);
     }
   };
 
   function sampleFromDistribution(probsArray) {
     let r = Math.random();
-    for (let i = 0; i < probsArray.length; i++) {
-      r -= probsArray[i];
-      if (r <= 0) return i;
-    }
+    for (let i = 0; i < probsArray.length; i++) { r -= probsArray[i]; if (r <= 0) return i; }
     return probsArray.length - 1;
   }
 
