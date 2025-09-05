@@ -178,9 +178,7 @@
         .map(l => l.trim());
 
       this.bpeRanks = {};
-      mergesList.forEach((m, i) => {
-        this.bpeRanks[m] = i;
-      });
+      mergesList.forEach((m, i) => { this.bpeRanks[m] = i; });
 
       this.cache = {};
     }
@@ -192,9 +190,7 @@
         const tokenBytes = text_to_bytes(token).map(b => byteToUnicode[b]).join('');
         const bpeStr = bpe(tokenBytes, this.bpeRanks, this.cache);
         const toks = bpeStr.split(' ').map(t => {
-          if (!(t in this.encoder)) {
-            return this.encoder['<|unk|>'] ?? 0;
-          }
+          if (!(t in this.encoder)) return this.encoder['<|unk|>'] ?? 0;
           return this.encoder[t];
         });
         bpeTokens.push(...toks);
@@ -272,16 +268,14 @@
     _ready: null,
     _model: null,
     _tokenizer: null,
-    _inputKey: null,
-    _outputKey: null,
+    _keys: null, // {inputIdsKey, attnMaskKey, outputKey}
 
     async _loadTokenizer() {
       // Try tokenizer.json (HF or local). If not present, fall back to vocab+merges.
       try {
         const tok = await firstOkJSON(CANDIDATE_TOKENIZER_JSON);
-        // Expect GPT-2 style tokenizer.json: { model: { vocab: {...}, merges: [...] } }
         if (tok?.model?.vocab && tok?.model?.merges) {
-          const vocab = tok.model.vocab; // token -> id
+          const vocab = tok.model.vocab;
           const merges = tok.model.merges.join('\n');
           return new GPT2Tokenizer(vocab, merges);
         }
@@ -296,12 +290,27 @@
       }
     },
 
-    async _inferIOKeys(model) {
-      // Best-effort names; different converters use different tensor names.
-      const inName = model.inputs?.[0]?.name;
-      const outName = model.outputs?.[0]?.name;
-      console.log('[TinyGPT] IO keys:', { input: inName, output: outName });
-      return { inName, outName };
+    _scanKeys(model) {
+      const inputs = model.inputs.map(t => t.name);
+      const outputs = model.outputs.map(t => t.name);
+
+      // Prefer canonical names; otherwise fall back to heuristics
+      const inputIdsKey =
+        inputs.find(n => /(^|\/)input_ids(:0)?$/i.test(n)) ||
+        inputs.find(n => /input.*ids/i.test(n)) ||
+        inputs[0];
+
+      const attnMaskKey =
+        inputs.find(n => /(^|\/)attention_mask(:0)?$/i.test(n)) ||
+        inputs.find(n => /attn.*mask/i.test(n)) ||
+        null;
+
+      const outputKey = outputs[0];
+
+      console.log('[TinyGPT] IO keys:', { inputIdsKey, attnMaskKey, outputKey, allInputs: inputs, allOutputs: outputs });
+      if (!inputIdsKey) throw new Error('[TinyGPT] Could not find an input_ids tensor name.');
+      if (!outputKey) throw new Error('[TinyGPT] Could not find an output tensor.');
+      return { inputIdsKey, attnMaskKey, outputKey };
     },
 
     async load() {
@@ -309,9 +318,7 @@
       this._ready = (async () => {
         this._tokenizer = await this._loadTokenizer();
         this._model = await firstOkGraphModel(CANDIDATE_MODEL_URLS);
-        const { inName, outName } = await this._inferIOKeys(this._model);
-        this._inputKey = inName;
-        this._outputKey = outName;
+        this._keys = this._scanKeys(this._model);
       })();
       return this._ready;
     },
@@ -328,26 +335,31 @@
         stopTokens = [],
       } = opts;
 
+      const { inputIdsKey, attnMaskKey, outputKey } = this._keys;
+
       let inputIds = this._tokenizer.encode(prompt);
       const MAX_CTX = 512;
 
       for (let step = 0; step < maxNewTokens; step++) {
         const ctxIds = inputIds.slice(-MAX_CTX);
         const x = tf.tensor(ctxIds, [1, ctxIds.length], 'int32');
+        const mask = attnMaskKey ? tf.onesLike(x, 'int32') : null;
 
-        let outputs, logits;
+        let logits;
         try {
-          outputs = (this._model.executeAsync
-            ? await this._model.executeAsync({ [this._inputKey]: x })
-            : this._model.execute({ [this._inputKey]: x }));
+          const feeds = attnMaskKey ? { [inputIdsKey]: x, [attnMaskKey]: mask } : { [inputIdsKey]: x };
+          const out = (this._model.executeAsync
+            ? await this._model.executeAsync(feeds)
+            : this._model.execute(feeds));
+          logits = Array.isArray(out) ? out[0] : out;
 
-          logits = Array.isArray(outputs) ? outputs[0] : outputs;
           if (!logits || logits.shape.length !== 3) {
-            throw new Error(`[TinyGPT] Unexpected logits shape ${logits?.shape}. Expected [1, seq, vocab].`);
+            throw new Error(`[TinyGPT] Unexpected logits shape ${JSON.stringify(logits?.shape)}. Expected [1, seq, vocab].`);
           }
         } catch (e) {
-          x.dispose();
-          console.error('[TinyGPT] Inference error. Input key:', this._inputKey, 'Model inputs:', this._model.inputs?.map(i=>i.name), e);
+          x.dispose(); mask?.dispose?.();
+          console.error('[TinyGPT] Inference error.\n Provided feeds keys:', Object.keys(attnMaskKey ? { [inputIdsKey]: 1, [attnMaskKey]: 1 } : { [inputIdsKey]: 1 }),
+                        '\n Model expects:', this._model.inputs.map(t => t.name));
           throw e;
         }
 
@@ -359,33 +371,33 @@
           nextId = (await indices.data())[0];
           indices.dispose();
         } else {
-          let logitsAdj = lastLogits.div(tf.scalar(temperature));
+          let l = lastLogits.div(tf.scalar(temperature));
           if (topK && topK > 0) {
-            const { values, indices } = tf.topk(logitsAdj, topK);
+            const { values, indices } = tf.topk(l, topK);
             const probs = tf.softmax(values);
             const probsData = await probs.data();
             const idx = sampleFromDistribution(probsData);
             nextId = (await indices.data())[idx];
             values.dispose(); indices.dispose(); probs.dispose();
           } else {
-            const probs = tf.softmax(logitsAdj);
+            const probs = tf.softmax(l);
             const probsData = await probs.data();
             nextId = sampleFromDistribution(probsData);
             probs.dispose();
           }
-          logitsAdj.dispose();
+          l.dispose();
         }
 
         lastLogits.dispose();
-        x.dispose();
         logits.dispose?.();
+        x.dispose();
+        mask?.dispose?.();
 
         inputIds.push(nextId);
         if (stopTokens.includes(nextId)) break;
       }
 
-      const outText = this._tokenizer.decode(inputIds);
-      return outText;
+      return this._tokenizer.decode(inputIds);
     },
 
     /**
