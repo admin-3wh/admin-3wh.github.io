@@ -94,21 +94,11 @@ delay 1000
   <!-- ShapeSound Core (ES module) -->
   <script type="module" src="shapesound.js"></script>
 
-  <!-- TF.js + WASM backend + TinyGPT -->
+  <!-- TF.js (must be before TinyGPT) -->
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.18.0/dist/tf.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-wasm@4.18.0/dist/tf-backend-wasm.min.js"></script>
-  <script>
-    (async () => {
-      try {
-        await tf.setBackend('wasm');    // prefer low-memory WASM in Safari
-        await tf.ready();
-        console.log('[ShapeSound] TF.js backend:', tf.getBackend());
-      } catch (e) {
-        console.warn('WASM backend set failed; continuing with default', e);
-      }
-    })();
-  </script>
-  <script src="tinygpt.js"></script>
+
+  <!-- TinyGPT loader (cache-busted so you get the latest) -->
+  <script src="tinygpt.js?v=6"></script>
 
   <!-- Hook Generate button -->
   <script>
