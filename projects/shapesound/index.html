@@ -91,30 +91,30 @@ delay 1000
     </div>
   </div>
 
-  <!-- ShapeSound Core (ES module) -->
-  <script type="module" src="shapesound.js"></script>
-
-  <!-- Bridge: expose module API on window for non-module scripts -->
+  <!-- Bridge: import the engine and expose a global API + readiness promise -->
   <script type="module">
-    import * as SS from './shapesound.js';
-    const api = SS.default || SS || {};
-    window.ShapeSound = {
-      loadFromText: api.loadFromText || api.load || api.parseAndRun || api.run || null,
-      play:         api.play         || api.start || null,
-      pause:        api.pause        || null,
-      resume:       api.resume       || api.unpause || null,
-      seek:         api.seek         || null,
-      render:       api.render       || api.renderInitial || null,
-      _raw:         api,
-    };
-    console.log('[ShapeSound] Bridge ready; exports:', Object.keys(api));
+    async function initBridge() {
+      const SS = await import('./shapesound.js');   // adjust path if needed
+      const api = SS.default || SS || {};
+      window.ShapeSound = {
+        loadFromText: api.loadFromText || api.load || api.parseAndRun || api.run || null,
+        play:         api.play         || api.start || null,
+        pause:        api.pause        || null,
+        resume:       api.resume       || api.unpause || null,
+        seek:         api.seek         || null,
+        render:       api.render       || api.renderInitial || null,
+        _raw:         api,
+      };
+      console.log('[ShapeSound] Bridge ready; exports:', Object.keys(api));
+    }
+    window.ShapeSoundReady = initBridge();
   </script>
 
   <!-- TF.js (must be before TinyGPT) -->
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.18.0/dist/tf.min.js"></script>
 
-  <!-- TinyGPT loader -->
-  <script src="tinygpt.js?v=7"></script>
+  <!-- TinyGPT loader (cache-busted) -->
+  <script src="tinygpt.js?v=9"></script>
 
   <!-- UI wiring: Generate + Run/Play/Pause/Resume + Theme -->
   <script>
@@ -145,25 +145,20 @@ delay 1000
 
     // Load + render current DSL
     async function loadAndRender() {
+      try { await window.ShapeSoundReady; } catch { setStatus('Engine bridge failed to initialize.'); return; }
+      const eng = window.ShapeSound;
+      if (!eng) { setStatus('Engine bridge not ready.'); return; }
+
       const code = codeArea.value || '';
-      if (!window.ShapeSound) {
-        setStatus('Engine bridge not ready.'); return;
-      }
       try {
-        if (typeof window.ShapeSound.loadFromText === 'function') {
-          await window.ShapeSound.loadFromText(code);
-        } else if (typeof window.ShapeSound._raw?.run === 'function') {
-          await window.ShapeSound._raw.run(code);
-        } else if (typeof window.ShapeSound._raw?.parseAndRun === 'function') {
-          await window.ShapeSound._raw.parseAndRun(code);
-        } else {
-          throw new Error('No load/run method found on ShapeSound');
-        }
-        if (typeof window.ShapeSound.render === 'function') {
-          window.ShapeSound.render();
-        } else if (typeof window.ShapeSound._raw?.renderInitial === 'function') {
-          window.ShapeSound._raw.renderInitial();
-        }
+        if (typeof eng.loadFromText === 'function')      await eng.loadFromText(code);
+        else if (typeof eng._raw?.run === 'function')    await eng._raw.run(code);
+        else if (typeof eng._raw?.parseAndRun === 'function') await eng._raw.parseAndRun(code);
+        else throw new Error('No load/run method found on ShapeSound');
+
+        if (typeof eng.render === 'function') eng.render();
+        else if (typeof eng._raw?.renderInitial === 'function') eng._raw.renderInitial();
+
         setStatus('Ready.', true);
       } catch (e) {
         console.error('[ShapeSound] load/run error', e);
@@ -172,9 +167,9 @@ delay 1000
     }
 
     $('#run')?.addEventListener('click', loadAndRender);
-    $('#play-scene')?.addEventListener('click', () => { try { window.ShapeSound?.play?.(); } catch(e){ console.error(e); } });
-    $('#pause-scene')?.addEventListener('click', () => { try { window.ShapeSound?.pause?.(); } catch(e){ console.error(e); } });
-    $('#resume-scene')?.addEventListener('click', () => { try { window.ShapeSound?.resume?.(); } catch(e){ console.error(e); } });
+    $('#play-scene')?.addEventListener('click', async () => { try { await window.ShapeSoundReady; window.ShapeSound?.play?.(); } catch(e){ console.error(e); } });
+    $('#pause-scene')?.addEventListener('click', async () => { try { await window.ShapeSoundReady; window.ShapeSound?.pause?.(); } catch(e){ console.error(e); } });
+    $('#resume-scene')?.addEventListener('click', async () => { try { await window.ShapeSoundReady; window.ShapeSound?.resume?.(); } catch(e){ console.error(e); } });
 
     // Theme Toggle
     const themeToggle = document.getElementById("theme-toggle");
