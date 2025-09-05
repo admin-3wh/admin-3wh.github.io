@@ -1,29 +1,31 @@
 /* projects/shapesound/tinygpt.js
  * TinyGPT loader + GPT-2 BPE tokenizer + simple generator for ShapeSound
- * Requires TF.js: <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.18.0/dist/tf.min.js"></script>
+ * Requires TF.js:
+ * <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.18.0/dist/tf.min.js"></script>
  */
 
 (function () {
   // ---------- Remote (HF) + Local fallbacks ----------
-  const HF_REPO = 'admin-3wh/shapesound-tinygpt';
-  const HF_BASE = `https://huggingface.co/${HF_REPO}/resolve/main`;
+  const HF_REPO  = 'admin-3wh/shapesound-tinygpt';
+  const HF_BASE  = `https://huggingface.co/${HF_REPO}/resolve/main`;
   const LOCAL_BASE = '/projects/shapesound/model';
 
+  // Prefer local first (fewer redirects / lower memory) then HF
   const CANDIDATE_MODEL_URLS = [
-    `${HF_BASE}/model.json`,
     `${LOCAL_BASE}/model.json`,
+    `${HF_BASE}/model.json`,
   ];
   const CANDIDATE_TOKENIZER_JSON = [
-    `${HF_BASE}/tokenizer.json`,
     `${LOCAL_BASE}/tokenizer.json`,
+    `${HF_BASE}/tokenizer.json`,
   ];
   const CANDIDATE_VOCAB_URLS = [
-    `${HF_BASE}/vocab.json`,
     `${LOCAL_BASE}/vocab.json`,
+    `${HF_BASE}/vocab.json`,
   ];
   const CANDIDATE_MERGES_URLS = [
-    `${HF_BASE}/merges.txt`,
     `${LOCAL_BASE}/merges.txt`,
+    `${HF_BASE}/merges.txt`,
   ];
 
   // ===== Utilities =====
@@ -98,7 +100,6 @@
     for (let i = 0; i < word.length - 1; i++) pairs.add(word[i] + SEP + word[i + 1]);
     return pairs;
   };
-
   function bpe(token, bpeRanks, cache) {
     if (cache[token]) return cache[token];
     let word = token.split('');
@@ -129,7 +130,6 @@
       if (word.length === 1) break;
       pairs = get_pairs(word);
     }
-
     return (cache[token] = word.join(' '));
   }
 
@@ -212,14 +212,17 @@
     _tokenizer: null,
     _inputNames: null,
     _outputNames: null,
+    _vocabSize: null, // set from tokenizer
 
     async _loadTokenizer() {
       // Prefer tokenizer.json; else vocab+merges
       try {
         const tok = await firstOkJSON(CANDIDATE_TOKENIZER_JSON);
         if (tok?.model?.vocab && tok?.model?.merges) {
-          const vocab = tok.model.vocab;
+          const vocab  = tok.model.vocab;
           const merges = tok.model.merges.join('\n');
+          const ids = Object.values(vocab);
+          this._vocabSize = (ids.length ? Math.max(...ids) + 1 : 50257);
           return new GPT2Tokenizer(vocab, merges);
         }
         throw new Error('Tokenizer JSON incompatible; falling back');
@@ -228,6 +231,8 @@
           firstOkJSON(CANDIDATE_VOCAB_URLS),
           firstOkText(CANDIDATE_MERGES_URLS),
         ]);
+        const ids = Object.values(vocab);
+        this._vocabSize = (ids.length ? Math.max(...ids) + 1 : 50257);
         return new GPT2Tokenizer(vocab, merges);
       }
     },
@@ -246,24 +251,42 @@
 
     _pickLogits(outputs) {
       const arr = Array.isArray(outputs) ? outputs : [outputs];
+      const V = this._vocabSize || 50257;
 
-      // 1) Prefer any named output containing "logits"
+      // helper: try squeezing to reduce rank (preserve original if squeeze fails)
+      function squeezeTo3D(t) {
+        if (!t) return t;
+        try {
+          const s = t.squeeze();
+          return s.shape.length <= t.shape.length ? s : t;
+        } catch { return t; }
+      }
+
+      // 1) Prefer any output named like "logits" after squeezing
       if (this._model?.outputs?.length) {
         for (let i = 0; i < this._model.outputs.length; i++) {
-          const nm = (this._model.outputs[i].name || '').toLowerCase();
-          const t  = arr[i];
-          if (nm.includes('logits') && t?.shape?.length === 3) return t;
+          const name = (this._model.outputs[i].name || '').toLowerCase();
+          const t = squeezeTo3D(arr[i]);
+          if (name.includes('logits') && t?.shape?.length === 3) return t;
         }
       }
-      // 2) Otherwise pick any rank-3 [1, seq, vocab] tensor
-      for (const t of arr) {
-        if (t?.shape?.length === 3) {
-          const [b, s, v] = t.shape;
-          if (b === 1 && v >= 1000) return t;
+
+      // 2) Otherwise choose a rank-3 tensor whose last dim matches vocab-ish
+      let best = null;
+      for (const raw of arr) {
+        const t = squeezeTo3D(raw);
+        const s = t?.shape;
+        if (!s || s.length !== 3) continue;
+        const [b, seq, voc] = s;
+        if (b !== 1) continue;
+        if (voc >= Math.max(1000, V - 512) && voc <= V + 512) {
+          if (!best || Math.abs(voc - V) < Math.abs(best.shape[2] - V)) best = t;
         }
       }
+      if (best) return best;
+
       const shapes = arr.map(t => t?.shape);
-      throw new Error(`[TinyGPT] Could not find logits. Output shapes: ${JSON.stringify(shapes)}`);
+      throw new Error(`[TinyGPT] Could not find logits. Output shapes: ${JSON.stringify(shapes)}; expected last dim ≈ ${V}`);
     },
 
     async load() {
@@ -282,22 +305,21 @@
       await this.load();
       const {
         maxNewTokens = 96,
-        temperature = 0.7,
-        topK = 40,
-        stopTokens = [],
+        temperature  = 0.7,
+        topK         = 40,
+        stopTokens   = [],
       } = opts;
 
-      const needInputIds  = this._expects('input_ids');
-      const needAttnMask  = this._expects('attention_mask');
+      const needInputIds = this._expects('input_ids');
+      const needAttnMask = this._expects('attention_mask');
 
       let inputIds = this._tokenizer.encode(prompt);
-      const MAX_CTX = 512;
+      const MAX_CTX = 96; // smaller context -> less memory in Safari
 
       for (let step = 0; step < maxNewTokens; step++) {
         const ctxIds = inputIds.slice(-MAX_CTX);
         const seqLen = ctxIds.length;
 
-        // Build feed map by real input names, or fall back to first input
         const feed = {};
         const firstInputName = this._inputNames?.[0];
         feed[needInputIds ? 'input_ids' : firstInputName] = tf.tensor(ctxIds, [1, seqLen], 'int32');
@@ -307,9 +329,8 @@
 
         let outputs, logits;
         try {
-          // Graph seems static → execute() is fine
           outputs = this._model.execute(feed);
-          logits = this._pickLogits(outputs);
+          logits  = this._pickLogits(outputs);
         } catch (e) {
           Object.values(feed).forEach(t => t.dispose?.());
           console.error('[TinyGPT] Inference error.\n Provided feeds keys:', Object.keys(feed),
@@ -333,21 +354,21 @@
           nextId = (await indices.data())[0];
           indices.dispose();
         } else {
-          let logitsAdj = lastLogits.div(tf.scalar(temperature));
+          let l = lastLogits.div(tf.scalar(temperature));
           if (topK && topK > 0) {
-            const { values, indices } = tf.topk(logitsAdj, topK);
+            const { values, indices } = tf.topk(l, topK);
             const probs = tf.softmax(values);
             const probsData = await probs.data();
             const idx = sampleFromDistribution(probsData);
             nextId = (await indices.data())[idx];
             values.dispose(); indices.dispose(); probs.dispose();
           } else {
-            const probs = tf.softmax(logitsAdj);
+            const probs = tf.softmax(l);
             const probsData = await probs.data();
             nextId = sampleFromDistribution(probsData);
             probs.dispose();
           }
-          logitsAdj.dispose();
+          l.dispose();
         }
 
         lastLogits.dispose();
@@ -370,7 +391,7 @@ End sequences with a closing curly brace on its own line.
 `;
       const delim = '\n<SEP>\n';
       const query = `${systemHint}${delim}${userPrompt.trim()}\n${delim}`;
-      const raw = await this.generate(query, { maxNewTokens: 192, temperature: 0.7, topK: 50 });
+      const raw = await this.generate(query, { maxNewTokens: 96, temperature: 0.7, topK: 50 });
 
       const parts = raw.split('<SEP>');
       const candidate = (parts.length > 1 ? parts[parts.length - 1] : raw).trim();
