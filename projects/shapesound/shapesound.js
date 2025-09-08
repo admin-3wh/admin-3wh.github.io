@@ -1,8 +1,8 @@
 // projects/shapesound/shapesound.js
 // NOTE: index.html should include this with: <script type="module" src="shapesound.js"></script>
 
-// TinyGPT is loaded as a global via <script src="tinygpt.js"> in index.html.
-// Do NOT import it as a module here.
+// TinyGPT is loaded separately and exposed as window.TinyGPT by tinygpt.js.
+// Do NOT import it here.
 
 // ------------------------------
 // Notes / Frequencies
@@ -267,539 +267,590 @@ function drawSprite(ctx, s) {
 }
 
 // ------------------------------
-// Boot
+// Parser + Runner
+// ------------------------------
+function parseAndSchedule(script, ctx, canvas) {
+  const rawLines = script.split("\n");
+  const lines = rawLines.map(l => l.trim()).filter(l => l !== "" && !l.startsWith("//"));
+
+  // reset state
+  animations = [];
+  timeline = [];
+  DRAWN_OBJECTS.length = 0;
+  CURRENT_BG = "#000000";
+  tempoBPM = 100;
+  for (const k in SPRITES) delete SPRITES[k];
+
+  PHYSICS.enabled = false;
+  PHYSICS.gravity = { x: 0, y: 0 };
+  PHYSICS.damping = 1.0;
+  PHYSICS.bounds = 'none';
+
+  // sequence parsing
+  let currentTime = 0;
+  let inSequence = false;
+  let sequenceNotes = [];
+
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  for (let line of lines) {
+    if (line.startsWith("sequence {")) {
+      inSequence = true;
+      sequenceNotes = [];
+      continue;
+    }
+    if (line === "}" && inSequence) {
+      timeline.push({ type: "sequence", notes: sequenceNotes, time: currentTime });
+      currentTime += sequenceNotes.length * (60 / tempoBPM) * 1000;
+      inSequence = false;
+      continue;
+    }
+    if (inSequence) {
+      sequenceNotes.push(...line.split(/\s+/));
+      continue;
+    }
+
+    const parts = line.split(/\s+/);
+    const cmd = parts[0];
+
+    switch (cmd) {
+      case "canvas":
+        canvas.width = parseInt(parts[1]);
+        canvas.height = parseInt(parts[2]);
+        break;
+
+      case "background":
+        CURRENT_BG = parts[1];
+        timeline.push({ type: "background", color: parts[1], time: currentTime });
+        break;
+
+      case "tempo": {
+        const bpm = parseInt(parts[1]);
+        if (!Number.isFinite(bpm) || bpm <= 0) throw new Error("tempo must be a positive number");
+        tempoBPM = bpm;
+        break;
+      }
+
+      // Basic shapes (retained)
+      case "circle": {
+        const [x, y, r] = parts.slice(1, 4).map(Number);
+        const color = parts.includes("color") ? parts[parts.indexOf("color") + 1] : "#FFF";
+        const shape = { type: "circle", x, y, r, color };
+        DRAWN_OBJECTS.push(shape);
+        timeline.push({ type: "draw", shape: "circle", ...shape, time: currentTime });
+        break;
+      }
+      case "rect": {
+        const [x, y, w, h] = parts.slice(1, 5).map(Number);
+        const color = parts.includes("color") ? parts[parts.indexOf("color") + 1] : "#FFF";
+        const shape = { type: "rect", x, y, w, h, color };
+        DRAWN_OBJECTS.push(shape);
+        timeline.push({ type: "draw", shape: "rect", ...shape, time: currentTime });
+        break;
+      }
+      case "line": {
+        const [x1, y1, x2, y2] = parts.slice(1, 5).map(Number);
+        const color = parts.includes("color") ? parts[parts.indexOf("color") + 1] : "#FFF";
+        const width = parts.includes("width") ? parseFloat(parts[parts.indexOf("width") + 1]) : 1;
+        const shape = { type: "line", x1, y1, x2, y2, width, color };
+        DRAWN_OBJECTS.push(shape);
+        timeline.push({ type: "draw", shape: "line", ...shape, time: currentTime });
+        break;
+      }
+
+      // Audio
+      case "sound": {
+        const freq = parseFloat(parts[1]);
+        const durSecs = parseFloat(parts[2]);
+        if (!Number.isFinite(freq) || !Number.isFinite(durSecs))
+          throw new Error("sound expects: sound FREQ SECONDS");
+        timeline.push({ type: "sound", freq, dur: durSecs, time: currentTime });
+        currentTime += durSecs * 1000;
+        break;
+      }
+      case "play": {
+        const note = parts[1];
+        if (!noteMap[note]) throw new Error(`unknown note: ${note}`);
+        timeline.push({ type: "play", note, time: currentTime });
+        currentTime += (60 / tempoBPM) * 1000;
+        break;
+      }
+      case "delay": {
+        const ms = parseInt(parts[1]);
+        if (!Number.isFinite(ms) || ms < 0) throw new Error("delay expects milliseconds");
+        currentTime += ms;
+        break;
+      }
+
+      // Procedural sprite turtle
+      case "sprite": {
+        const name = parts[1];         // turtle
+        const action = parts[2] || ""; // crawling
+        const kv = Object.fromEntries(
+          parts.slice(3).map(tok => tok.split("=")).filter(a => a.length === 2)
+        );
+        const x = Number(kv.x ?? 100);
+        const y = Number(kv.y ?? 520);
+        const scale = Number(kv.scale ?? 1);
+        const color = kv.color || null;
+
+        if (name !== "turtle") throw new Error(`unknown sprite: ${name}`);
+        timeline.push({ type: "draw", shape: "sprite-turtle", x, y, scale, color, action, time: currentTime });
+        DRAWN_OBJECTS.push({ type: "sprite-turtle", x, y, scale, color, action });
+        break;
+      }
+
+      // Assets
+      case "asset": {
+        // asset image palm "assets/palm.png"
+        // asset spritesheet turtle walk "assets/turtle_walk.png" frame 64x64 frames 8 fps 10
+        const kind = parts[1];
+        if (kind === "image") {
+          const key = parts[2];
+          const src = line.match(/"([^"]+)"/)?.[1];
+          if (!src) throw new Error('asset image missing "src"');
+          loadImage(src).then(img => (ASSETS.images[key] = img));
+        } else if (kind === "spritesheet") {
+          const key = (parts[2] || "sheet") + (parts[3] ? "_" + parts[3] : "");
+          const src = line.match(/"([^"]+)"/)?.[1];
+          const fIdx = parts.indexOf("frame");
+          const framesIdx = parts.indexOf("frames");
+          const fpsIdx = parts.indexOf("fps");
+          if (fIdx === -1 || framesIdx === -1) throw new Error("spritesheet requires frame WxH and frames N");
+          const [fw, fh] = parts[fIdx + 1].split("x").map(Number);
+          const frames = parseInt(parts[framesIdx + 1]);
+          const fps = fpsIdx !== -1 ? parseInt(parts[fpsIdx + 1]) : 8;
+          loadImage(src).then(img => {
+            ASSETS.sheets[key] = { img, frameW: fw, frameH: fh, frames, fps };
+          });
+        } else {
+          throw new Error("unknown asset kind");
+        }
+        break;
+      }
+
+      // Sprite instances from assets
+      case "spriteimg": {
+        // spriteimg turtle1 from spritesheet turtle_walk at 120 520 scale 1.2
+        const id = parts[1];
+        if (!id) throw new Error("spriteimg requires an id");
+        const fromIdx = parts.indexOf("from");
+        const atIdx = parts.indexOf("at");
+        if (fromIdx === -1 || atIdx === -1) throw new Error("spriteimg missing 'from' or 'at'");
+        const kind = parts[fromIdx + 1]; // 'spritesheet' or 'image'
+        const key = parts[fromIdx + 2];
+        const x = parseFloat(parts[atIdx + 1]);
+        const y = parseFloat(parts[atIdx + 2]);
+        const scaleIdx = parts.indexOf("scale");
+        const scale = scaleIdx !== -1 ? parseFloat(parts[scaleIdx + 1]) : 1;
+
+        if (kind === "image") {
+          if (!ASSETS.images[key]) console.warn(`image asset '${key}' not loaded yet`);
+          SPRITES[id] = { id, type: 'image', key, x, y, scale, physics: false };
+        } else if (kind === "spritesheet") {
+          if (!ASSETS.sheets[key]) console.warn(`spritesheet asset '${key}' not loaded yet`);
+          SPRITES[id] = { id, type: 'sheet', key, x, y, scale, frame: 0, playing: false, physics: false };
+        } else {
+          throw new Error("spriteimg 'from' must be 'image' or 'spritesheet'");
+        }
+        timeline.push({ type: "drawsprite", id, time: currentTime });
+        break;
+      }
+
+      case "playframes": {
+        const id = parts[1];
+        if (SPRITES[id]) SPRITES[id].playing = true;
+        break;
+      }
+      case "stopframes": {
+        const id = parts[1];
+        if (SPRITES[id]) SPRITES[id].playing = false;
+        break;
+      }
+      case "setfps": {
+        const id = parts[1];
+        const fps = parseFloat(parts[2]);
+        if (SPRITES[id]) SPRITES[id].fps = fps;
+        break;
+      }
+
+      // Physics toggles and params
+      case "physics": {
+        const state = parts[1];
+        PHYSICS.enabled = (state === "on");
+        break;
+      }
+      case "gravity": {
+        PHYSICS.gravity.x = parseFloat(parts[1]);
+        PHYSICS.gravity.y = parseFloat(parts[2]);
+        break;
+      }
+      case "damping": {
+        PHYSICS.damping = parseFloat(parts[1]);
+        break;
+      }
+      case "bounds": {
+        PHYSICS.bounds = parts[1]; // 'canvas' or 'none'
+        break;
+      }
+      case "setvel": {
+        const id = parts[1];
+        const vx = parseFloat(parts[2]), vy = parseFloat(parts[3]);
+        if (SPRITES[id]) { SPRITES[id].physics = true; SPRITES[id].vx = vx; SPRITES[id].vy = vy; }
+        break;
+      }
+      case "impulse": {
+        const id = parts[1];
+        const ix = parseFloat(parts[2]), iy = parseFloat(parts[3]);
+        if (SPRITES[id]) { SPRITES[id].physics = true; SPRITES[id].vx = (SPRITES[id].vx || 0) + ix; SPRITES[id].vy = (SPRITES[id].vy || 0) + iy; }
+        break;
+      }
+
+      // Wiggle
+      case "wiggle": {
+        // wiggle <id> ampX ampY freq  OR  wiggle <id> amp freq
+        const id = parts[1];
+        const a2 = parseFloat(parts[2]);
+        const a3 = parseFloat(parts[3]);
+        const a4 = parseFloat(parts[4]);
+        if (!SPRITES[id]) break;
+        if (Number.isFinite(a2) && Number.isFinite(a3) && Number.isFinite(a4)) {
+          SPRITES[id].wiggle = { ampX: a2, ampY: a3, freq: a4 };
+        } else if (Number.isFinite(a2) && Number.isFinite(a3)) {
+          SPRITES[id].wiggle = { amp: a2, freq: a3 };
+        } else {
+          throw new Error("wiggle expects: wiggle <id> ampX ampY freq  OR  wiggle <id> amp freq");
+        }
+        break;
+      }
+
+      // Path shorthand (linear) -> animatesprite (with ease)
+      case "path": {
+        // path <id> (x1,y1) -> (x2,y2) duration 5s [ease in|out|in-out|linear]
+        const id = parts[1];
+        const arrow = parts.indexOf("->");
+        if (arrow === -1) throw new Error("path missing '->'");
+        const p1 = parts[2].replace(/[()]/g, "").split(",");
+        const p2 = parts[arrow + 1].replace(/[()]/g, "").split(",");
+        const durKey = parts.indexOf("duration");
+        if (durKey === -1) throw new Error("path missing duration");
+        const duration = parseFloat(parts[durKey + 1].replace("s", "")) * 1000;
+
+        let ease = "linear";
+        const easeIdx = parts.indexOf("ease");
+        if (easeIdx !== -1) ease = (parts[easeIdx + 1] || "linear");
+
+        const s = SPRITES[id];
+        const scale = s?.scale ?? 1;
+        const from = [parseFloat(p1[0]), parseFloat(p1[1]), scale];
+        const to   = [parseFloat(p2[0]), parseFloat(p2[1]), scale];
+        timeline.push({ type: "animatesprite", id, from, to, duration, ease, time: currentTime });
+        currentTime += duration;
+        currentScene.duration = Math.max(currentScene.duration || 0, currentTime / 1000);
+        break;
+      }
+
+      // Animate (shapes or sprites)
+      case "animate": {
+        const shape = parts[1];
+
+        if (shape === "sprite") {
+          const id = parts[2];
+          const arrowIndex = parts.indexOf("->");
+          if (arrowIndex === -1) throw new Error("animate sprite missing '->'");
+          const from = parts.slice(3, arrowIndex).map(Number);
+          const to = parts.slice(arrowIndex + 1, arrowIndex + 4).map(Number);
+          const durKey = parts.indexOf("duration");
+          if (durKey === -1) throw new Error("animate missing duration");
+          const duration = parseFloat(parts[durKey + 1].replace("s", "")) * 1000;
+
+          let ease = "linear";
+          const easeIdx = parts.indexOf("ease");
+          if (easeIdx !== -1) ease = (parts[easeIdx + 1] || "linear");
+
+          timeline.push({ type: "animatesprite", id, from, to, duration, ease, time: currentTime });
+          currentTime += duration;
+          currentScene.duration = Math.max(currentScene.duration || 0, currentTime / 1000);
+          break;
+        }
+
+        // circle/rect linears with optional colors
+        const from = parts.slice(2, 5).map(Number);
+        const to = parts.slice(6, 9).map(Number);
+        const durKey = parts.indexOf("duration");
+        if (durKey === -1) throw new Error("animate missing duration");
+        const duration = parseFloat(parts[durKey + 1].replace("s", "")) * 1000;
+        const fromColor = parts.includes("fromColor") ? parts[parts.indexOf("fromColor") + 1] : null;
+        const toColor = parts.includes("toColor") ? parts[parts.indexOf("toColor") + 1] : null;
+
+        let ease = "linear";
+        const easeIdx = parts.indexOf("ease");
+        if (easeIdx !== -1) ease = (parts[easeIdx + 1] || "linear");
+
+        timeline.push({ type: "animate", shape, from, to, duration, fromColor, toColor, ease, time: currentTime });
+        currentTime += duration;
+        currentScene.duration = Math.max(currentScene.duration || 0, currentTime / 1000);
+        break;
+      }
+
+      default:
+        throw new Error(`Unknown command: ${cmd}`);
+    }
+  }
+}
+
+function startScene(ctx, canvas) {
+  animations = [];
+  startTime = performance.now();
+  lastNow = startTime;
+  pauseOffset = 0;
+  paused = false;
+  requestAnimationFrame(now => loop(now, ctx, canvas));
+}
+
+function loop(now, ctx, canvas) {
+  if (paused) return;
+
+  const elapsed = now - startTime;
+  const dtSec = Math.min(0.05, (now - (lastNow || now)) / 1000); // cap dt
+  lastNow = now;
+
+  // Physics + frame stepping
+  stepPhysics(dtSec, canvas);
+  for (const id in SPRITES) stepSpriteAnimation(SPRITES[id], dtSec);
+
+  // Process timeline events whose time has arrived
+  while (timeline.length && elapsed >= timeline[0].time) {
+    const item = timeline.shift();
+    switch (item.type) {
+      case "background":
+        CURRENT_BG = item.color;
+        break;
+
+      case "draw":
+        // retained in DRAWN_OBJECTS already
+        break;
+
+      case "drawsprite":
+        // instance already exists in SPRITES
+        break;
+
+      case "sound":
+        playTone(item.freq, item.dur);
+        break;
+
+      case "play":
+        playTone(noteMap[item.note], Math.max(0.1, (60 / tempoBPM) * 0.9));
+        break;
+
+      case "sequence":
+        playSequence(item.notes);
+        break;
+
+      case "animate":
+        animations.push({ ...item, start: now });
+        break;
+
+      case "animatesprite":
+        animations.push({ ...item, start: now });
+        break;
+    }
+  }
+
+  // Clear and redraw the retained scene every frame
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  // background
+  ctx.fillStyle = CURRENT_BG;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  // static shapes
+  for (const obj of DRAWN_OBJECTS) {
+    if (obj.type === "circle") {
+      ctx.beginPath();
+      ctx.arc(obj.x, obj.y, obj.r, 0, 2 * Math.PI);
+      ctx.fillStyle = obj.color || "#FFF";
+      ctx.fill();
+    } else if (obj.type === "rect") {
+      ctx.fillStyle = obj.color || "#FFF";
+      ctx.fillRect(obj.x, obj.y, obj.w, obj.h);
+    } else if (obj.type === "line") {
+      ctx.beginPath();
+      ctx.strokeStyle = obj.color || "#FFF";
+      ctx.lineWidth = obj.width || 1;
+      ctx.moveTo(obj.x1, obj.y1);
+      ctx.lineTo(obj.x2, obj.y2);
+      ctx.stroke();
+    } else if (obj.type === "sprite-turtle") {
+      drawTurtle(ctx, obj.x, obj.y, obj.scale || 1, obj.color || null);
+    }
+  }
+  // sprites (image/spritesheet) drawn every frame
+  for (const id in SPRITES) {
+    drawSprite(ctx, SPRITES[id]);
+  }
+
+  // Active animations (shapes and sprites)
+  animations = animations.filter(anim => {
+    let t = Math.min((now - anim.start) / anim.duration, 1);
+    t = applyEase(t, anim.ease);
+
+    if (anim.type === "animate") {
+      const color = anim.fromColor && anim.toColor
+        ? interpolateColor(anim.fromColor, anim.toColor, t)
+        : null;
+
+      if (anim.shape === "circle") {
+        const [x1, y1, r1] = anim.from;
+        const [x2, y2, r2] = anim.to;
+        const x = x1 + (x2 - x1) * t;
+        const y = y1 + (y2 - y1) * t;
+        const r = r1 + (r2 - r1) * t;
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, 2 * Math.PI);
+        ctx.fillStyle = color || "#FF00FF";
+        ctx.fill();
+      } else if (anim.shape === "rect") {
+        const [x1, y1, w1] = anim.from;
+        const [x2, y2, w2] = anim.to;
+        const x = x1 + (x2 - x1) * t;
+        const y = y1 + (y2 - y1) * t;
+        const w = w1 + (w2 - w1) * t;
+        ctx.fillStyle = color || "#00FFFF";
+        ctx.fillRect(x, y, w, w);
+      }
+    } else if (anim.type === "animatesprite") {
+      const s = SPRITES[anim.id];
+      if (!s) return false;
+      const [x1, y1, sc1] = anim.from;
+      const [x2, y2, sc2] = anim.to;
+      s.x = x1 + (x2 - x1) * t;
+      s.y = y1 + (y2 - y1) * t;
+      s.scale = sc1 + (sc2 - sc1) * t;
+    }
+
+    return t < 1;
+  });
+
+  // timeline scrubber reflect progress
+  const scrubber = document.getElementById("timeline-scrubber");
+  if (scrubber && currentScene.duration) {
+    scrubber.value = Math.min((elapsed / (currentScene.duration * 1000)) * 100, 100);
+  }
+
+  if (timeline.length > 0 || animations.length > 0 || Object.keys(SPRITES).length > 0) {
+    requestAnimationFrame(n => loop(n, ctx, canvas));
+  }
+}
+
+// ------------------------------
+// Public API (global) + UI wiring
+// ------------------------------
+function runFromText(code) {
+  const canvas = document.getElementById("canvas");
+  const ctx = canvas.getContext("2d");
+  try {
+    parseAndSchedule(code, ctx, canvas);
+  } catch (err) {
+    const box = document.getElementById("error-box");
+    if (box) { box.style.display = 'block'; box.textContent = `Parse error: ${err.message}`; }
+    throw err;
+  }
+  // Kick the scene
+  const box = document.getElementById("error-box");
+  if (box) { box.style.display = 'none'; box.textContent = ''; }
+  startScene(ctx, canvas);
+}
+
+function renderInitial() {
+  const canvas = document.getElementById("canvas");
+  const ctx = canvas.getContext("2d");
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = CURRENT_BG;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  for (const obj of DRAWN_OBJECTS) {
+    if (obj.type === "circle") {
+      ctx.beginPath();
+      ctx.arc(obj.x, obj.y, obj.r, 0, 2 * Math.PI);
+      ctx.fillStyle = obj.color || "#FFF";
+      ctx.fill();
+    } else if (obj.type === "rect") {
+      ctx.fillStyle = obj.color || "#FFF";
+      ctx.fillRect(obj.x, obj.y, obj.w, obj.h);
+    } else if (obj.type === "line") {
+      ctx.beginPath();
+      ctx.strokeStyle = obj.color || "#FFF";
+      ctx.lineWidth = obj.width || 1;
+      ctx.moveTo(obj.x1, obj.y1);
+      ctx.lineTo(obj.x2, obj.y2);
+      ctx.stroke();
+    } else if (obj.type === "sprite-turtle") {
+      drawTurtle(ctx, obj.x, obj.y, obj.scale || 1, obj.color || null);
+    }
+  }
+}
+
+window.ShapeSound = {
+  // Primary entry point used by index.html
+  async loadFromText(code) { runFromText(code || ""); },
+  // Alias(es) for flexibility
+  async parseAndRun(code) { runFromText(code || ""); },
+  async run(code) { runFromText(code || ""); },
+
+  // Playback controls
+  play() {
+    if (!paused) return;
+    paused = false;
+    startTime = performance.now() - pauseOffset;
+    lastNow = startTime;
+    const canvas = document.getElementById("canvas");
+    const ctx = canvas.getContext("2d");
+    requestAnimationFrame(now => loop(now, ctx, canvas));
+  },
+  pause() { paused = true; },
+  resume() {
+    this.play();
+  },
+  seek(percent01) {
+    if (!currentScene.duration) return;
+    percent01 = Math.min(Math.max(percent01, 0), 1);
+    pauseOffset = currentScene.duration * 1000 * percent01;
+    paused = true;
+    const scrubber = document.getElementById("timeline-scrubber");
+    if (scrubber) scrubber.value = percent01 * 100;
+  },
+  render: renderInitial,
+  // expose internals (optional)
+  _state: () => ({ tempoBPM, CURRENT_BG, DRAWN_OBJECTS, timeline, animations, SPRITES })
+};
+
+// ------------------------------
+// DOM wiring for native buttons
 // ------------------------------
 document.addEventListener("DOMContentLoaded", () => {
   const canvas = document.getElementById("canvas");
   const ctx = canvas.getContext("2d");
   const codeArea = document.getElementById("code");
 
-  // ------------------
-  // Run ShapeSound Script (Parser)
-  // ------------------
-  document.getElementById("run").addEventListener("click", () => {
-    const script = codeArea.value;
-    const rawLines = script.split("\n");
-    const lines = rawLines.map(l => l.trim()).filter(l => l !== "" && !l.startsWith("//"));
-
-    // reset state
-    animations = [];
-    timeline = [];
-    DRAWN_OBJECTS.length = 0;
-    CURRENT_BG = "#000000";
-    tempoBPM = 100;
-    for (const k in SPRITES) delete SPRITES[k];
-
-    PHYSICS.enabled = false;
-    PHYSICS.gravity = { x: 0, y: 0 };
-    PHYSICS.damping = 1.0;
-    PHYSICS.bounds = 'none';
-
-    // sequence parsing
-    let currentTime = 0;
-    let inSequence = false;
-    let sequenceNotes = [];
-
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    for (let line of lines) {
-      if (line.startsWith("sequence {")) {
-        inSequence = true;
-        sequenceNotes = [];
-        continue;
-      }
-      if (line === "}" && inSequence) {
-        timeline.push({ type: "sequence", notes: sequenceNotes, time: currentTime });
-        currentTime += sequenceNotes.length * (60 / tempoBPM) * 1000;
-        inSequence = false;
-        continue;
-      }
-      if (inSequence) {
-        sequenceNotes.push(...line.split(/\s+/));
-        continue;
-      }
-
-      const parts = line.split(/\s+/);
-      const cmd = parts[0];
-
-      try {
-        switch (cmd) {
-          case "canvas":
-            canvas.width = parseInt(parts[1]);
-            canvas.height = parseInt(parts[2]);
-            break;
-
-          case "background":
-            CURRENT_BG = parts[1];
-            timeline.push({ type: "background", color: parts[1], time: currentTime });
-            break;
-
-          case "tempo": {
-            const bpm = parseInt(parts[1]);
-            if (!Number.isFinite(bpm) || bpm <= 0) throw new Error("tempo must be a positive number");
-            tempoBPM = bpm;
-            break;
-          }
-
-          // Basic shapes (retained)
-          case "circle": {
-            const [x, y, r] = parts.slice(1, 4).map(Number);
-            const color = parts.includes("color") ? parts[parts.indexOf("color") + 1] : "#FFF";
-            const shape = { type: "circle", x, y, r, color };
-            DRAWN_OBJECTS.push(shape);
-            timeline.push({ type: "draw", shape: "circle", ...shape, time: currentTime });
-            break;
-          }
-          case "rect": {
-            const [x, y, w, h] = parts.slice(1, 5).map(Number);
-            const color = parts.includes("color") ? parts[parts.indexOf("color") + 1] : "#FFF";
-            const shape = { type: "rect", x, y, w, h, color };
-            DRAWN_OBJECTS.push(shape);
-            timeline.push({ type: "draw", shape: "rect", ...shape, time: currentTime });
-            break;
-          }
-          case "line": {
-            const [x1, y1, x2, y2] = parts.slice(1, 5).map(Number);
-            const color = parts.includes("color") ? parts[parts.indexOf("color") + 1] : "#FFF";
-            const width = parts.includes("width") ? parseFloat(parts[parts.indexOf("width") + 1]) : 1;
-            const shape = { type: "line", x1, y1, x2, y2, width, color };
-            DRAWN_OBJECTS.push(shape);
-            timeline.push({ type: "draw", shape: "line", ...shape, time: currentTime });
-            break;
-          }
-
-          // Audio
-          case "sound": {
-            const freq = parseFloat(parts[1]);
-            const durSecs = parseFloat(parts[2]);
-            if (!Number.isFinite(freq) || !Number.isFinite(durSecs))
-              throw new Error("sound expects: sound FREQ SECONDS");
-            timeline.push({ type: "sound", freq, dur: durSecs, time: currentTime });
-            currentTime += durSecs * 1000;
-            break;
-          }
-          case "play": {
-            const note = parts[1];
-            if (!noteMap[note]) throw new Error(`unknown note: ${note}`);
-            timeline.push({ type: "play", note, time: currentTime });
-            currentTime += (60 / tempoBPM) * 1000;
-            break;
-          }
-          case "delay": {
-            const ms = parseInt(parts[1]);
-            if (!Number.isFinite(ms) || ms < 0) throw new Error("delay expects milliseconds");
-            currentTime += ms;
-            break;
-          }
-
-          // Procedural sprite turtle
-          case "sprite": {
-            const name = parts[1];         // turtle
-            const action = parts[2] || ""; // crawling
-            const kv = Object.fromEntries(
-              parts.slice(3).map(tok => tok.split("=")).filter(a => a.length === 2)
-            );
-            const x = Number(kv.x ?? 100);
-            const y = Number(kv.y ?? 520);
-            const scale = Number(kv.scale ?? 1);
-            const color = kv.color || null;
-
-            if (name !== "turtle") throw new Error(`unknown sprite: ${name}`);
-            timeline.push({ type: "draw", shape: "sprite-turtle", x, y, scale, color, action, time: currentTime });
-            DRAWN_OBJECTS.push({ type: "sprite-turtle", x, y, scale, color, action });
-            break;
-          }
-
-          // Assets
-          case "asset": {
-            // asset image palm "assets/palm.png"
-            // asset spritesheet turtle walk "assets/turtle_walk.png" frame 64x64 frames 8 fps 10
-            const kind = parts[1];
-            if (kind === "image") {
-              const key = parts[2];
-              const src = line.match(/"([^"]+)"/)?.[1];
-              if (!src) throw new Error('asset image missing "src"');
-              loadImage(src).then(img => (ASSETS.images[key] = img));
-            } else if (kind === "spritesheet") {
-              const key = (parts[2] || "sheet") + (parts[3] ? "_" + parts[3] : "");
-              const src = line.match(/"([^"]+)"/)?.[1];
-              const fIdx = parts.indexOf("frame");
-              const framesIdx = parts.indexOf("frames");
-              const fpsIdx = parts.indexOf("fps");
-              if (fIdx === -1 || framesIdx === -1) throw new Error("spritesheet requires frame WxH and frames N");
-              const [fw, fh] = parts[fIdx + 1].split("x").map(Number);
-              const frames = parseInt(parts[framesIdx + 1]);
-              const fps = fpsIdx !== -1 ? parseInt(parts[fpsIdx + 1]) : 8;
-              loadImage(src).then(img => {
-                ASSETS.sheets[key] = { img, frameW: fw, frameH: fh, frames, fps };
-              });
-            } else {
-              throw new Error("unknown asset kind");
-            }
-            break;
-          }
-
-          // Sprite instances from assets
-          case "spriteimg": {
-            // spriteimg turtle1 from spritesheet turtle_walk at 120 520 scale 1.2
-            const id = parts[1];
-            if (!id) throw new Error("spriteimg requires an id");
-            const fromIdx = parts.indexOf("from");
-            const atIdx = parts.indexOf("at");
-            if (fromIdx === -1 || atIdx === -1) throw new Error("spriteimg missing 'from' or 'at'");
-            const kind = parts[fromIdx + 1]; // 'spritesheet' or 'image'
-            const key = parts[fromIdx + 2];
-            const x = parseFloat(parts[atIdx + 1]);
-            const y = parseFloat(parts[atIdx + 2]);
-            const scaleIdx = parts.indexOf("scale");
-            const scale = scaleIdx !== -1 ? parseFloat(parts[scaleIdx + 1]) : 1;
-
-            if (kind === "image") {
-              if (!ASSETS.images[key]) console.warn(`image asset '${key}' not loaded yet`);
-              SPRITES[id] = { id, type: 'image', key, x, y, scale, physics: false };
-            } else if (kind === "spritesheet") {
-              if (!ASSETS.sheets[key]) console.warn(`spritesheet asset '${key}' not loaded yet`);
-              SPRITES[id] = { id, type: 'sheet', key, x, y, scale, frame: 0, playing: false, physics: false };
-            } else {
-              throw new Error("spriteimg 'from' must be 'image' or 'spritesheet'");
-            }
-            timeline.push({ type: "drawsprite", id, time: currentTime });
-            break;
-          }
-
-          case "playframes": {
-            const id = parts[1];
-            if (SPRITES[id]) SPRITES[id].playing = true;
-            break;
-          }
-          case "stopframes": {
-            const id = parts[1];
-            if (SPRITES[id]) SPRITES[id].playing = false;
-            break;
-          }
-          case "setfps": {
-            const id = parts[1];
-            const fps = parseFloat(parts[2]);
-            if (SPRITES[id]) SPRITES[id].fps = fps;
-            break;
-          }
-
-          // Physics toggles and params
-          case "physics": {
-            const state = parts[1];
-            PHYSICS.enabled = (state === "on");
-            break;
-          }
-          case "gravity": {
-            PHYSICS.gravity.x = parseFloat(parts[1]);
-            PHYSICS.gravity.y = parseFloat(parts[2]);
-            break;
-          }
-          case "damping": {
-            PHYSICS.damping = parseFloat(parts[1]);
-            break;
-          }
-          case "bounds": {
-            PHYSICS.bounds = parts[1]; // 'canvas' or 'none'
-            break;
-          }
-          case "setvel": {
-            const id = parts[1];
-            const vx = parseFloat(parts[2]), vy = parseFloat(parts[3]);
-            if (SPRITES[id]) { SPRITES[id].physics = true; SPRITES[id].vx = vx; SPRITES[id].vy = vy; }
-            break;
-          }
-          case "impulse": {
-            const id = parts[1];
-            const ix = parseFloat(parts[2]), iy = parseFloat(parts[3]);
-            if (SPRITES[id]) { SPRITES[id].physics = true; SPRITES[id].vx = (SPRITES[id].vx || 0) + ix; SPRITES[id].vy = (SPRITES[id].vy || 0) + iy; }
-            break;
-          }
-
-          // Wiggle
-          case "wiggle": {
-            // wiggle <id> ampX ampY freq  OR  wiggle <id> amp freq
-            const id = parts[1];
-            const a2 = parseFloat(parts[2]);
-            const a3 = parseFloat(parts[3]);
-            const a4 = parseFloat(parts[4]);
-            if (!SPRITES[id]) break;
-            if (Number.isFinite(a2) && Number.isFinite(a3) && Number.isFinite(a4)) {
-              SPRITES[id].wiggle = { ampX: a2, ampY: a3, freq: a4 };
-            } else if (Number.isFinite(a2) && Number.isFinite(a3)) {
-              SPRITES[id].wiggle = { amp: a2, freq: a3 };
-            } else {
-              throw new Error("wiggle expects: wiggle <id> ampX ampY freq  OR  wiggle <id> amp freq");
-            }
-            break;
-          }
-
-          // Path shorthand (linear) -> animatesprite (with ease)
-          case "path": {
-            // path <id> (x1,y1) -> (x2,y2) duration 5s [ease in|out|in-out|linear]
-            const id = parts[1];
-            const arrow = parts.indexOf("->");
-            if (arrow === -1) throw new Error("path missing '->'");
-            const p1 = parts[2].replace(/[()]/g, "").split(",");
-            const p2 = parts[arrow + 1].replace(/[()]/g, "").split(",");
-            const durKey = parts.indexOf("duration");
-            if (durKey === -1) throw new Error("path missing duration");
-            const duration = parseFloat(parts[durKey + 1].replace("s", "")) * 1000;
-
-            let ease = "linear";
-            const easeIdx = parts.indexOf("ease");
-            if (easeIdx !== -1) ease = (parts[easeIdx + 1] || "linear");
-
-            const s = SPRITES[id];
-            const scale = s?.scale ?? 1;
-            const from = [parseFloat(p1[0]), parseFloat(p1[1]), scale];
-            const to   = [parseFloat(p2[0]), parseFloat(p2[1]), scale];
-            timeline.push({ type: "animatesprite", id, from, to, duration, ease, time: currentTime });
-            currentTime += duration;
-            currentScene.duration = Math.max(currentScene.duration || 0, currentTime / 1000);
-            break;
-          }
-
-          // Animate (shapes or sprites)
-          case "animate": {
-            const shape = parts[1];
-
-            if (shape === "sprite") {
-              const id = parts[2];
-              const arrowIndex = parts.indexOf("->");
-              if (arrowIndex === -1) throw new Error("animate sprite missing '->'");
-              const from = parts.slice(3, arrowIndex).map(Number);
-              const to = parts.slice(arrowIndex + 1, arrowIndex + 4).map(Number);
-              const durKey = parts.indexOf("duration");
-              if (durKey === -1) throw new Error("animate missing duration");
-              const duration = parseFloat(parts[durKey + 1].replace("s", "")) * 1000;
-
-              let ease = "linear";
-              const easeIdx = parts.indexOf("ease");
-              if (easeIdx !== -1) ease = (parts[easeIdx + 1] || "linear");
-
-              timeline.push({ type: "animatesprite", id, from, to, duration, ease, time: currentTime });
-              currentTime += duration;
-              currentScene.duration = Math.max(currentScene.duration || 0, currentTime / 1000);
-              break;
-            }
-
-            // circle/rect linears with optional colors
-            const from = parts.slice(2, 5).map(Number);
-            const to = parts.slice(6, 9).map(Number);
-            const durKey = parts.indexOf("duration");
-            if (durKey === -1) throw new Error("animate missing duration");
-            const duration = parseFloat(parts[durKey + 1].replace("s", "")) * 1000;
-            const fromColor = parts.includes("fromColor") ? parts[parts.indexOf("fromColor") + 1] : null;
-            const toColor = parts.includes("toColor") ? parts[parts.indexOf("toColor") + 1] : null;
-
-            let ease = "linear";
-            const easeIdx = parts.indexOf("ease");
-            if (easeIdx !== -1) ease = (parts[easeIdx + 1] || "linear");
-
-            timeline.push({ type: "animate", shape, from, to, duration, fromColor, toColor, ease, time: currentTime });
-            currentTime += duration;
-            currentScene.duration = Math.max(currentScene.duration || 0, currentTime / 1000);
-            break;
-          }
-
-          default:
-            throw new Error(`Unknown command: ${cmd}`);
-        }
-      } catch (err) {
-        return showError(`Error on line: "${line}"\n${err.message}`);
-      }
-    }
-
-    showError("");
-    startScene(ctx);
+  // "Run" button uses the same public API
+  document.getElementById("run")?.addEventListener("click", () => {
+    window.ShapeSound.loadFromText(codeArea.value || "");
   });
-
-  // ------------------
-  // Render Loop
-  // ------------------
-  function startScene(ctx) {
-    animations = [];
-    startTime = performance.now();
-    lastNow = startTime;
-    pauseOffset = 0;
-    paused = false;
-    requestAnimationFrame(loop);
-  }
-
-  function loop(now) {
-    if (paused) return;
-
-    const elapsed = now - startTime;
-    const dtSec = Math.min(0.05, (now - (lastNow || now)) / 1000); // cap dt
-    lastNow = now;
-
-    // Physics + frame stepping
-    stepPhysics(dtSec, canvas);
-    for (const id in SPRITES) stepSpriteAnimation(SPRITES[id], dtSec);
-
-    // Process timeline events whose time has arrived
-    while (timeline.length && elapsed >= timeline[0].time) {
-      const item = timeline.shift();
-      switch (item.type) {
-        case "background":
-          CURRENT_BG = item.color;
-          break;
-
-        case "draw": {
-          // retained in DRAWN_OBJECTS already
-          break;
-        }
-
-        case "drawsprite":
-          // instance already exists in SPRITES
-          break;
-
-        case "sound":
-          playTone(item.freq, item.dur);
-          break;
-
-        case "play":
-          playTone(noteMap[item.note], Math.max(0.1, (60 / tempoBPM) * 0.9));
-          break;
-
-        case "sequence":
-          playSequence(item.notes);
-          break;
-
-        case "animate":
-          animations.push({ ...item, start: now });
-          break;
-
-        case "animatesprite":
-          animations.push({ ...item, start: now });
-          break;
-      }
-    }
-
-    // Clear and redraw the retained scene every frame
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    // background
-    ctx.fillStyle = CURRENT_BG;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    // static shapes
-    for (const obj of DRAWN_OBJECTS) {
-      if (obj.type === "circle") {
-        ctx.beginPath();
-        ctx.arc(obj.x, obj.y, obj.r, 0, 2 * Math.PI);
-        ctx.fillStyle = obj.color || "#FFF";
-        ctx.fill();
-      } else if (obj.type === "rect") {
-        ctx.fillStyle = obj.color || "#FFF";
-        ctx.fillRect(obj.x, obj.y, obj.w, obj.h);
-      } else if (obj.type === "line") {
-        ctx.beginPath();
-        ctx.strokeStyle = obj.color || "#FFF";
-        ctx.lineWidth = obj.width || 1;
-        ctx.moveTo(obj.x1, obj.y1);
-        ctx.lineTo(obj.x2, obj.y2);
-        ctx.stroke();
-      } else if (obj.type === "sprite-turtle") {
-        drawTurtle(ctx, obj.x, obj.y, obj.scale || 1, obj.color || null);
-      }
-    }
-    // sprites (image/spritesheet) drawn every frame
-    for (const id in SPRITES) {
-      drawSprite(ctx, SPRITES[id]);
-    }
-
-    // Active animations (shapes and sprites)
-    animations = animations.filter(anim => {
-      let t = Math.min((now - anim.start) / anim.duration, 1);
-      t = applyEase(t, anim.ease);
-
-      if (anim.type === "animate") {
-        const color = anim.fromColor && anim.toColor
-          ? interpolateColor(anim.fromColor, anim.toColor, t)
-          : null;
-
-        if (anim.shape === "circle") {
-          const [x1, y1, r1] = anim.from;
-          const [x2, y2, r2] = anim.to;
-          const x = x1 + (x2 - x1) * t;
-          const y = y1 + (y2 - y1) * t;
-          const r = r1 + (r2 - r1) * t;
-          ctx.beginPath();
-          ctx.arc(x, y, r, 0, 2 * Math.PI);
-          ctx.fillStyle = color || "#FF00FF";
-          ctx.fill();
-        } else if (anim.shape === "rect") {
-          const [x1, y1, w1] = anim.from;
-          const [x2, y2, w2] = anim.to;
-          const x = x1 + (x2 - x1) * t;
-          const y = y1 + (y2 - y1) * t;
-          const w = w1 + (w2 - w1) * t;
-          ctx.fillStyle = color || "#00FFFF";
-          ctx.fillRect(x, y, w, w);
-        }
-      } else if (anim.type === "animatesprite") {
-        const s = SPRITES[anim.id];
-        if (!s) return false;
-        const [x1, y1, sc1] = anim.from;
-        const [x2, y2, sc2] = anim.to;
-        s.x = x1 + (x2 - x1) * t;
-        s.y = y1 + (y2 - y1) * t;
-        s.scale = sc1 + (sc2 - sc1) * t;
-      }
-
-      return t < 1;
-    });
-
-    // timeline scrubber reflect progress
-    const scrubber = document.getElementById("timeline-scrubber");
-    if (scrubber && currentScene.duration) {
-      scrubber.value = Math.min((elapsed / (currentScene.duration * 1000)) * 100, 100);
-    }
-
-    if (timeline.length > 0 || animations.length > 0 || Object.keys(SPRITES).length > 0) {
-      requestAnimationFrame(loop);
-    }
-  }
-
-  function showError(msg) {
-    const box = document.getElementById("error-box");
-    if (box) {
-      box.textContent = msg;
-      box.style.display = msg ? "block" : "none";
-    }
-  }
-
-  // ------------------
-  // Extra Controls
-  // ------------------
 
   // Timeline controls
   document.getElementById("play-scene")?.addEventListener("click", () => {
-    paused = false;
-    startTime = performance.now() - pauseOffset;
-    lastNow = startTime;
-    requestAnimationFrame(loop);
+    window.ShapeSound.play();
   });
-
   document.getElementById("pause-scene")?.addEventListener("click", () => {
-    paused = true;
+    window.ShapeSound.pause();
   });
-
   document.getElementById("resume-scene")?.addEventListener("click", () => {
-    paused = false;
-    startTime = performance.now() - pauseOffset;
-    lastNow = startTime;
-    requestAnimationFrame(loop);
+    window.ShapeSound.resume();
   });
-
   document.getElementById("timeline-scrubber")?.addEventListener("input", (e) => {
-    if (!currentScene.duration) return;
-    const percent = parseFloat(e.target.value) / 100;
-    pauseOffset = currentScene.duration * 1000 * percent;
-    paused = true;
+    const val = parseFloat(e.target.value) / 100;
+    window.ShapeSound.seek(isFinite(val) ? val : 0);
   });
 
-  // Natural Prompt → Script (Rule-based quick gen stays; AI is separate button)
+  // Natural Prompt → Script (rule-based quick gen; TinyGPT handled in tinygpt.js via Generate button)
   document.getElementById("convert-prompt")?.addEventListener("click", () => {
     const input = document.getElementById("natural-prompt").value.toLowerCase().trim();
     const output = [];
@@ -850,7 +901,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Example Picker
   document.getElementById("example-picker")?.addEventListener("change", (e) => {
-    const code = document.getElementById("code");
     const val = e.target.value;
     const examples = {
       example1: `canvas 800 600
@@ -870,7 +920,7 @@ sprite turtle crawling x=100 y=520 scale=1
 animate sprite turtle 100 520 1 -> 700 520 1 duration 8s ease in-out
 sequence { C3 E3 G3 }`
     };
-    code.value = examples[val] || "";
+    document.getElementById("code").value = examples[val] || "";
   });
 
   // Help Toggle
@@ -897,7 +947,7 @@ sequence { C3 E3 G3 }`
   document.getElementById("save-scene")?.addEventListener("click", () => {
     const name = prompt("Enter name for this scene:");
     if (name) {
-      localStorage.setItem("ss-" + name, codeArea.value);
+      localStorage.setItem("ss-" + name, document.getElementById("code").value);
       updateSavedScenes();
     }
   });
@@ -927,49 +977,8 @@ sequence { C3 E3 G3 }`
 
   // Copy Code
   document.getElementById("copy-code")?.addEventListener("click", () => {
-    navigator.clipboard.writeText(codeArea.value).then(() => {
+    navigator.clipboard.writeText(document.getElementById("code").value).then(() => {
       alert("Code copied to clipboard!");
     });
   });
-
-  // ---- AI Integration (TinyGPT global) ----
-  (async function setupAI() {
-    const aiBtn = document.getElementById('ai-generate');   // optional separate button; OK if null
-    const aiStatus = document.getElementById('ai-status');
-    const aiRetry = document.getElementById('ai-retry');
-    if (!aiBtn) return;
-
-    let loaded = false;
-    async function ensureLoaded() {
-      if (!loaded && window.TinyGPT?.load) {
-        aiStatus && (aiStatus.style.display = 'inline');
-        await window.TinyGPT.load();
-        aiStatus && (aiStatus.style.display = 'none');
-        loaded = true;
-      }
-    }
-
-    aiBtn.addEventListener('click', async () => {
-      const prompt = (document.getElementById('natural-prompt')?.value || "").trim();
-      if (!prompt) { alert("Enter a prompt first."); return; }
-      await ensureLoaded();
-
-      aiStatus && (aiStatus.style.display = 'inline');
-      aiRetry && (aiRetry.style.display = 'none');
-      try {
-        const dsl = await window.TinyGPT.promptToSceneDSL(prompt);
-        aiStatus && (aiStatus.style.display = 'none');
-        document.getElementById('code').value = dsl;
-      } catch (e) {
-        aiStatus && (aiStatus.style.display = 'none');
-        aiRetry && (aiRetry.style.display = 'inline');
-        const box = document.getElementById('error-box');
-        if (box) { box.style.display = 'block'; box.textContent = "AI generation failed: " + e.message; }
-      }
-    });
-
-    aiRetry?.addEventListener('click', async () => {
-      aiBtn.click();
-    });
-  })();
 });
