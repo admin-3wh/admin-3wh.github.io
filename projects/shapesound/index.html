@@ -91,21 +91,49 @@ delay 1000
     </div>
   </div>
 
-  <!-- Bridge: import the engine and expose a global API + readiness promise -->
+  <!-- Bridge: import engine, normalize API, expose readiness -->
   <script type="module">
-    async function initBridge() {
-      const SS = await import('./shapesound.js');   // adjust path if needed
-      const api = SS.default || SS || {};
-      window.ShapeSound = {
+    function normalizeAPI(mod) {
+      let api = mod?.default ?? mod ?? {};
+      // If default is a class/ctor, try to instantiate (best-effort)
+      try {
+        if (typeof api === 'function' && !('loadFromText' in api) && !('run' in api)) {
+          api = new api(); // ignore if it throws
+        }
+      } catch {}
+      // If engine already published a global, prefer that
+      if (window.ShapeSound && typeof window.ShapeSound === 'object') {
+        api = { ...api, ...window.ShapeSound };
+      }
+      return {
         loadFromText: api.loadFromText || api.load || api.parseAndRun || api.run || null,
-        play:         api.play         || api.start || null,
-        pause:        api.pause        || null,
-        resume:       api.resume       || api.unpause || null,
-        seek:         api.seek         || null,
-        render:       api.render       || api.renderInitial || null,
+        play:         api.play || api.start || null,
+        pause:        api.pause || null,
+        resume:       api.resume || api.unpause || null,
+        seek:         api.seek || null,
+        render:       api.render || api.renderInitial || null,
         _raw:         api,
       };
-      console.log('[ShapeSound] Bridge ready; exports:', Object.keys(api));
+    }
+
+    async function initBridge() {
+      const cacheBust = `?v=${Date.now()}`;
+      try {
+        const mod = await import('./shapesound.js' + cacheBust);
+        const api = normalizeAPI(mod);
+        window.ShapeSound = api;
+        console.log('[ShapeSound] Bridge ready; exports:', Object.keys(api._raw || {}));
+      } catch (err) {
+        console.error('[ShapeSound] Failed to import ./shapesound.js', err);
+        // Surface the reason in the UI if the error box exists
+        const box = document.getElementById('error-box');
+        if (box) {
+          box.style.display = 'block';
+          box.style.color = 'orangered';
+          box.textContent = 'Engine bridge failed to initialize: ' + (err?.message || err);
+        }
+        throw err;
+      }
     }
     window.ShapeSoundReady = initBridge();
   </script>
@@ -114,9 +142,9 @@ delay 1000
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.18.0/dist/tf.min.js"></script>
 
   <!-- TinyGPT loader (cache-busted) -->
-  <script src="tinygpt.js?v=9"></script>
+  <script src="tinygpt.js?v=10"></script>
 
-  <!-- UI wiring: Generate + Run/Play/Pause/Resume + Theme -->
+  <!-- UI wiring -->
   <script>
     const $ = (s) => document.querySelector(s);
     const codeArea = $('#code');
@@ -151,8 +179,8 @@ delay 1000
 
       const code = codeArea.value || '';
       try {
-        if (typeof eng.loadFromText === 'function')      await eng.loadFromText(code);
-        else if (typeof eng._raw?.run === 'function')    await eng._raw.run(code);
+        if (typeof eng.loadFromText === 'function')           await eng.loadFromText(code);
+        else if (typeof eng._raw?.run === 'function')         await eng._raw.run(code);
         else if (typeof eng._raw?.parseAndRun === 'function') await eng._raw.parseAndRun(code);
         else throw new Error('No load/run method found on ShapeSound');
 
