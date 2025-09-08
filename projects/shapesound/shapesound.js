@@ -1,7 +1,8 @@
 // projects/shapesound/shapesound.js
 // NOTE: index.html should include this with: <script type="module" src="shapesound.js"></script>
 
-import { promptToDSL, loadTinyGPT } from './tinygpt.js';
+// TinyGPT is loaded as a global via <script src="tinygpt.js"> in index.html.
+// Do NOT import it as a module here.
 
 // ------------------------------
 // Notes / Frequencies
@@ -931,16 +932,21 @@ sequence { C3 E3 G3 }`
     });
   });
 
-  // ---- AI Integration (TF.js path handled in tinygpt.js) ----
+  // ---- AI Integration (TinyGPT global) ----
   (async function setupAI() {
-    const aiBtn = document.getElementById('ai-generate');
+    const aiBtn = document.getElementById('ai-generate');   // optional separate button; OK if null
     const aiStatus = document.getElementById('ai-status');
     const aiRetry = document.getElementById('ai-retry');
     if (!aiBtn) return;
 
     let loaded = false;
     async function ensureLoaded() {
-      if (!loaded) { aiStatus.style.display = 'inline'; await loadTinyGPT(); aiStatus.style.display = 'none'; loaded = true; }
+      if (!loaded && window.TinyGPT?.load) {
+        aiStatus && (aiStatus.style.display = 'inline');
+        await window.TinyGPT.load();
+        aiStatus && (aiStatus.style.display = 'none');
+        loaded = true;
+      }
     }
 
     aiBtn.addEventListener('click', async () => {
@@ -948,24 +954,17 @@ sequence { C3 E3 G3 }`
       if (!prompt) { alert("Enter a prompt first."); return; }
       await ensureLoaded();
 
-      aiStatus.style.display = 'inline';
-      aiRetry.style.display = 'none';
+      aiStatus && (aiStatus.style.display = 'inline');
+      aiRetry && (aiRetry.style.display = 'none');
       try {
-        const { ok, errors, dsl } = await promptToDSL(prompt);
-        aiStatus.style.display = 'none';
-        if (!ok) {
-          const box = document.getElementById('error-box');
-          box.style.display = 'block';
-          box.textContent = "AI output had issues:\n" + errors.slice(0,5).join("\n");
-          aiRetry.style.display = 'inline';
-        }
+        const dsl = await window.TinyGPT.promptToSceneDSL(prompt);
+        aiStatus && (aiStatus.style.display = 'none');
         document.getElementById('code').value = dsl;
       } catch (e) {
-        aiStatus.style.display = 'none';
-        aiRetry.style.display = 'inline';
+        aiStatus && (aiStatus.style.display = 'none');
+        aiRetry && (aiRetry.style.display = 'inline');
         const box = document.getElementById('error-box');
-        box.style.display = 'block';
-        box.textContent = "AI generation failed: " + e.message;
+        if (box) { box.style.display = 'block'; box.textContent = "AI generation failed: " + e.message; }
       }
     });
 
