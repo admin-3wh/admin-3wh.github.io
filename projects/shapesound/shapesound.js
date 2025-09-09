@@ -70,10 +70,32 @@ function applyEase(t, ease) {
 }
 
 // ------------------------------
-// Audio
+// Audio  (shared AudioContext + unlock on first gesture)
 // ------------------------------
+let AC = null;
+let audioUnlocked = false;
+
+function getAC() {
+  if (!AC) AC = new (window.AudioContext || window.webkitAudioContext)();
+  if (AC.state === 'suspended') {
+    // Resume may reject if not from a user gesture; we ignore and try next click
+    AC.resume().catch(() => {});
+  }
+  return AC;
+}
+
+function unlockAudioOnce() {
+  if (audioUnlocked) return;
+  audioUnlocked = true;
+  try { getAC(); } catch (_) {}
+}
+// unlock on the first user interaction
+['click','touchstart','keydown'].forEach(evt =>
+  window.addEventListener(evt, unlockAudioOnce, { once: true, passive: true })
+);
+
 function playTone(freq, duration = 1) {
-  const ctx = new (window.AudioContext || window.webkitAudioContext)();
+  const ctx = getAC();
   const osc = ctx.createOscillator();
   const gain = ctx.createGain();
   osc.type = "sine";
@@ -311,7 +333,7 @@ function parseAndSchedule(script, ctx, canvas) {
     }
 
     const parts = line.split(/\s+/);
-    const cmd = parts[0];
+       const cmd = parts[0];
 
     switch (cmd) {
       case "canvas":
@@ -658,10 +680,11 @@ function loop(now, ctx, canvas) {
   }
 
   // Clear and redraw the retained scene every frame
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  const w = canvas.width, h = canvas.height;
+  ctx.clearRect(0, 0, w, h);
   // background
   ctx.fillStyle = CURRENT_BG;
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillRect(0, 0, w, h);
   // static shapes
   for (const obj of DRAWN_OBJECTS) {
     if (obj.type === "circle") {
@@ -713,9 +736,9 @@ function loop(now, ctx, canvas) {
         const [x2, y2, w2] = anim.to;
         const x = x1 + (x2 - x1) * t;
         const y = y1 + (y2 - y1) * t;
-        const w = w1 + (w2 - w1) * t;
+        const w2h = w1 + (w2 - w1) * t;
         ctx.fillStyle = color || "#00FFFF";
-        ctx.fillRect(x, y, w, w);
+        ctx.fillRect(x, y, w2h, w2h);
       }
     } else if (anim.type === "animatesprite") {
       const s = SPRITES[anim.id];
@@ -797,18 +820,18 @@ window.ShapeSound = {
 
   // Playback controls
   play() {
-    if (!paused) return;
+    // Make Play act as "start or resume" (not no-op when already running)
     paused = false;
-    startTime = performance.now() - pauseOffset;
+    startTime = performance.now() - (pauseOffset || 0);
     lastNow = startTime;
     const canvas = document.getElementById("canvas");
     const ctx = canvas.getContext("2d");
-    requestAnimationFrame(now => loop(now, ctx, canvas));
+    requestAnimationFrame(now => {
+      if (!paused) loop(now, ctx, canvas);
+    });
   },
   pause() { paused = true; },
-  resume() {
-    this.play();
-  },
+  resume() { this.play(); },
   seek(percent01) {
     if (!currentScene.duration) return;
     percent01 = Math.min(Math.max(percent01, 0), 1);
@@ -832,17 +855,21 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // "Run" button uses the same public API
   document.getElementById("run")?.addEventListener("click", () => {
+    // Ensure audio is unlocked by this gesture
+    unlockAudioOnce();
     window.ShapeSound.loadFromText(codeArea.value || "");
   });
 
   // Timeline controls
   document.getElementById("play-scene")?.addEventListener("click", () => {
+    unlockAudioOnce();
     window.ShapeSound.play();
   });
   document.getElementById("pause-scene")?.addEventListener("click", () => {
     window.ShapeSound.pause();
   });
   document.getElementById("resume-scene")?.addEventListener("click", () => {
+    unlockAudioOnce();
     window.ShapeSound.resume();
   });
   document.getElementById("timeline-scrubber")?.addEventListener("input", (e) => {
@@ -896,7 +923,7 @@ document.addEventListener("DOMContentLoaded", () => {
       output.push("// Unsupported prompt. Try 'turtle crawling with slow notes' or '4 white squares'.");
     }
 
-    codeArea.value = output.join("\n");
+    document.getElementById("code").value = output.join("\n");
   });
 
   // Example Picker
