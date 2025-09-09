@@ -251,6 +251,14 @@ function drawSprite(ctx, s) {
   const tx = (s.x || 0) + dx;
   const ty = (s.y || 0) + dy;
 
+  // NEW: procedural turtle as a live sprite type
+  if (s.type === 'proc-turtle') {
+    const sc = s.scale || 1;
+    const col = s.color || null;
+    drawTurtle(ctx, tx, ty, sc, col);
+    return;
+  }
+
   if (s.type === 'image') {
     const img = ASSETS.images[s.key];
     if (!img) {
@@ -333,7 +341,7 @@ function parseAndSchedule(script, ctx, canvas) {
     }
 
     const parts = line.split(/\s+/);
-       const cmd = parts[0];
+    const cmd = parts[0];
 
     switch (cmd) {
       case "canvas":
@@ -404,7 +412,7 @@ function parseAndSchedule(script, ctx, canvas) {
         break;
       }
 
-      // Procedural sprite turtle
+      // Procedural sprite turtle  (CHANGED: make it a live sprite with an id)
       case "sprite": {
         const name = parts[1];         // turtle
         const action = parts[2] || ""; // crawling
@@ -415,10 +423,13 @@ function parseAndSchedule(script, ctx, canvas) {
         const y = Number(kv.y ?? 520);
         const scale = Number(kv.scale ?? 1);
         const color = kv.color || null;
+        const id = kv.id || 'turtle'; // default id if not provided
 
         if (name !== "turtle") throw new Error(`unknown sprite: ${name}`);
-        timeline.push({ type: "draw", shape: "sprite-turtle", x, y, scale, color, action, time: currentTime });
-        DRAWN_OBJECTS.push({ type: "sprite-turtle", x, y, scale, color, action });
+
+        // NEW: create a live sprite entry instead of a static DRAWN_OBJECT
+        SPRITES[id] = { id, type: 'proc-turtle', x, y, scale, color, action, physics: false, playing: false };
+        timeline.push({ type: "drawsprite", id, time: currentTime }); // available immediately
         break;
       }
 
@@ -654,7 +665,7 @@ function loop(now, ctx, canvas) {
         break;
 
       case "drawsprite":
-        // instance already exists in SPRITES
+        // sprite already in SPRITES; nothing else to do
         break;
 
       case "sound":
@@ -702,11 +713,10 @@ function loop(now, ctx, canvas) {
       ctx.moveTo(obj.x1, obj.y1);
       ctx.lineTo(obj.x2, obj.y2);
       ctx.stroke();
-    } else if (obj.type === "sprite-turtle") {
-      drawTurtle(ctx, obj.x, obj.y, obj.scale || 1, obj.color || null);
     }
+    // NOTE: no 'sprite-turtle' here anymore — turtles render as live sprites below
   }
-  // sprites (image/spritesheet) drawn every frame
+  // live sprites (image/sheet/proc-turtle) drawn every frame
   for (const id in SPRITES) {
     drawSprite(ctx, SPRITES[id]);
   }
@@ -805,8 +815,6 @@ function renderInitial() {
       ctx.moveTo(obj.x1, obj.y1);
       ctx.lineTo(obj.x2, obj.y2);
       ctx.stroke();
-    } else if (obj.type === "sprite-turtle") {
-      drawTurtle(ctx, obj.x, obj.y, obj.scale || 1, obj.color || null);
     }
   }
 }
@@ -820,7 +828,7 @@ window.ShapeSound = {
 
   // Playback controls
   play() {
-    // Make Play act as "start or resume" (not no-op when already running)
+    // Make Play act as "start or resume"
     paused = false;
     startTime = performance.now() - (pauseOffset || 0);
     lastNow = startTime;
