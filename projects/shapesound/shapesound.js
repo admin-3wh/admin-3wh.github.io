@@ -29,51 +29,16 @@ let startTime = null;
 let lastNow = null;
 
 // Retained drawing state so shapes persist across frames
-let CURRENT_BG = "#000000";        // can be string or {type:'noise',...}
-let NOISE_BG = null;               // {scale, speed, c1, c2, t}
-const DRAWN_OBJECTS = []; // array of {type, ...shapeProps}
+let CURRENT_BG = "#000000";
+let BG_NOISE = null; // {scale, speed, colors:[c1,c2], phase}
+const DRAWN_OBJECTS = []; // array of {type, id?, ...shapeProps}
 
 // ------------------------------
-// Lightweight generative helpers
+// Deterministic RNG (seed)
 // ------------------------------
-// Seeded RNG (deterministic)
-let RNG_SEED = 12345;
-function srand(seed){ RNG_SEED = (seed|0) || 1; }
-function rand(){ // xorshift32 -> 0..1
-  let x = RNG_SEED |= 0;
-  x ^= x << 13; x ^= x >>> 17; x ^= x << 5;
-  RNG_SEED = x;
-  return ((x >>> 0) / 4294967295);
-}
-function randRange(a,b){ return a + (b-a) * rand(); }
-
-// Tiny color helpers (global; different names than ones inside interpolateColor)
-function gHexToRgb(hex){
-  const n = parseInt(hex.slice(1),16);
-  return [(n>>16)&255, (n>>8)&255, n&255];
-}
-function gRgbToHex([r,g,b]){
-  return "#" + [r,g,b].map(v=>Math.max(0,Math.min(255,v|0)).toString(16).padStart(2,"0")).join("");
-}
-function mixRGB(a,b,t){ return [ a[0]+(b[0]-a[0])*t, a[1]+(b[1]-a[1])*t, a[2]+(b[2]-a[2])*t ]; }
-
-// Super-light 2D value noise (hashed grid + bilinear)
-function hash2(ix, iy){
-  let x = (ix*374761393) ^ (iy*668265263);
-  x = (x ^ (x>>>13)) * 1274126177;
-  x = (x ^ (x>>>16)) >>> 0;
-  return x / 4294967295; // 0..1
-}
-function valueNoise2(x, y){
-  const x0 = Math.floor(x), y0 = Math.floor(y);
-  const x1 = x0 + 1,        y1 = y0 + 1;
-  const fx = x - x0,        fy = y - y0;
-  const v00 = hash2(x0,y0), v10 = hash2(x1,y0);
-  const v01 = hash2(x0,y1), v11 = hash2(x1,y1);
-  const i1 = v00 + (v10 - v00) * fx;
-  const i2 = v01 + (v11 - v01) * fx;
-  return i1 + (i2 - i1) * fy; // 0..1
-}
+let SEED = 1337, RNG = mulberry32(SEED);
+function mulberry32(a){ return function(){ let t=a+=0x6D2B79F5; t=Math.imul(t^t>>>15,t|1); t^=t+Math.imul(t^t>>>7,t|61); return ((t^t>>>14)>>>0)/4294967296; } }
+function setSeed(n){ SEED = (n>>>0)||1337; RNG = mulberry32(SEED); }
 
 // ------------------------------
 // Assets + Sprites
@@ -88,6 +53,7 @@ const SPRITES = {};        // id -> sprite object
 function loadImage(src) {
   return new Promise((resolve, reject) => {
     const img = new Image();
+    img.crossOrigin = "anonymous";
     img.onload = () => resolve(img);
     img.onerror = reject;
     img.src = src;
@@ -125,7 +91,6 @@ function getAC() {
   }
   return AC;
 }
-
 function unlockAudioOnce() {
   if (audioUnlocked) return;
   audioUnlocked = true;
@@ -172,12 +137,15 @@ function interpolateColor(c1, c2, t) {
   return rgbToHex(mix);
 }
 
+function randRange(a,b){ return a + RNG()*(b-a); }
+function clamp01(x){ return x<0?0:(x>1?1:x); }
+
 // ------------------------------
 // Procedural Turtle
 // ------------------------------
 function drawTurtle(ctx, x, y, scale = 1, colorVariant = null) {
   const greens = ["#228B22", "#2E8B57", "#006400"];
-  const shellColor = colorVariant || greens[Math.floor(Math.random() * greens.length)];
+  const shellColor = colorVariant || greens[Math.floor(RNG()*greens.length)];
   const bellyColor = "#654321";
   const eyeColor = "#000000";
   const s = scale;
@@ -258,6 +226,58 @@ function stepPhysics(dtSec, canvas) {
 }
 
 // ------------------------------
+// Generative Shapes
+// ------------------------------
+function drawStar(ctx, cx, cy, rOuter, rInner, points, color, rotDeg=0){
+  const rot = (rotDeg*Math.PI)/180;
+  ctx.beginPath();
+  for(let i=0;i<points*2;i++){
+    const r = i%2===0 ? rOuter : rInner;
+    const a = rot + (i*Math.PI)/points;
+    const x = cx + Math.cos(a)*r;
+    const y = cy + Math.sin(a)*r;
+    i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+  }
+  ctx.closePath();
+  ctx.fillStyle = color;
+  ctx.fill();
+}
+
+function drawPoly(ctx,cx,cy,rad,sides,color,rotDeg=0){
+  const rot = (rotDeg*Math.PI)/180;
+  ctx.beginPath();
+  for(let i=0;i<sides;i++){
+    const a = rot + (i*2*Math.PI)/sides;
+    const x = cx + Math.cos(a)*rad;
+    const y = cy + Math.sin(a)*rad;
+    i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+  }
+  ctx.closePath();
+  ctx.fillStyle = color;
+  ctx.fill();
+}
+
+// Organic blob using harmonic noise (cheap, animatable)
+function drawBlob(ctx, obj, timeSec){
+  const {x,y,r,points,jitter,color,phase=0,speed=0.4} = obj;
+  const P = points||18, J = jitter||r*0.25;
+  const t = phase + timeSec*(speed||0);
+  ctx.beginPath();
+  for(let i=0;i<P;i++){
+    const a = (i/P)*Math.PI*2;
+    // two harmonic terms for semi-organic motion
+    const n = Math.sin(a*3 + t)*0.5 + Math.sin(a*5 - t*1.3)*0.5;
+    const rr = r + n*J;
+    const px = x + Math.cos(a)*rr;
+    const py = y + Math.sin(a)*rr;
+    i===0?ctx.moveTo(px,py):ctx.lineTo(px,py);
+  }
+  ctx.closePath();
+  ctx.fillStyle = color || "#77ffaa";
+  ctx.fill();
+}
+
+// ------------------------------
 // Sprite drawing with wiggle + fallbacks
 // ------------------------------
 function drawSpriteFallback(ctx, s, x, y) {
@@ -278,7 +298,7 @@ function drawSpriteFallback(ctx, s, x, y) {
 }
 
 function drawSprite(ctx, s) {
-  // wiggle offsets
+  // wiggle offsets (idle)
   let dx = 0, dy = 0;
   if (s.wiggle && lastNow != null && startTime != null) {
     const t = (lastNow - startTime) / 1000; // seconds
@@ -292,7 +312,6 @@ function drawSprite(ctx, s) {
   const tx = (s.x || 0) + dx;
   const ty = (s.y || 0) + dy;
 
-  // Procedural turtle live sprite
   if (s.type === 'proc-turtle') {
     const sc = s.scale || 1;
     const col = s.color || null;
@@ -349,9 +368,10 @@ function parseAndSchedule(script, ctx, canvas) {
   timeline = [];
   DRAWN_OBJECTS.length = 0;
   CURRENT_BG = "#000000";
-  NOISE_BG = null;
+  BG_NOISE = null;
   tempoBPM = 100;
   for (const k in SPRITES) delete SPRITES[k];
+  setSeed(SEED); // maintain seed
 
   PHYSICS.enabled = false;
   PHYSICS.gravity = { x: 0, y: 0 };
@@ -365,7 +385,8 @@ function parseAndSchedule(script, ctx, canvas) {
 
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  for (let line of lines) {
+  for (let raw of lines) {
+    let line = raw;
     if (line.startsWith("sequence {")) {
       inSequence = true;
       sequenceNotes = [];
@@ -385,14 +406,16 @@ function parseAndSchedule(script, ctx, canvas) {
     const parts = line.split(/\s+/);
     const cmd = parts[0];
 
+    // helpers to read kv flags like id=foo, speed=0.5, rot=30
+    const kvPairs = Object.fromEntries(parts.slice(1).filter(p=>p.includes("=")).map(p=>p.split("=")));
+    function getId(){ return kvPairs.id || null; }
+
     switch (cmd) {
       case "seed": {
-        const s = parseInt(parts[1]);
-        if (!Number.isFinite(s)) throw new Error("seed expects an integer");
-        srand(s);
+        const n = parseInt(parts[1],10);
+        if (Number.isFinite(n)) setSeed(n);
         break;
       }
-
       case "canvas":
         canvas.width = parseInt(parts[1]);
         canvas.height = parseInt(parts[2]);
@@ -404,16 +427,12 @@ function parseAndSchedule(script, ctx, canvas) {
         break;
 
       case "backgroundnoise": {
-        // backgroundnoise <scale> <speed> color <c1> <c2>
-        const scale = parseFloat(parts[1]) || 80;
-        const speed = parseFloat(parts[2]) || 0.03;
-        const ci = parts.indexOf("color");
-        if (ci === -1) throw new Error("backgroundnoise needs: backgroundnoise scale speed color #c1 #c2");
-        const c1 = parts[ci+1] || "#000000";
-        const c2 = parts[ci+2] || "#222244";
-        CURRENT_BG = { type:"noise", scale, speed, c1, c2 };
-        NOISE_BG = { scale, speed, c1, c2, t: 0 };
-        timeline.push({ type:"background", time: currentTime });
+        // backgroundnoise scale speed color #c1 #c2
+        const scale = parseFloat(parts[1]) || 1.2;
+        const speed = parseFloat(parts[2]) || 0.15;
+        const c1 = parts[4] || "#0a0f1a";
+        const c2 = parts[5] || "#162035";
+        BG_NOISE = { scale, speed, colors:[c1,c2], phase: 0 };
         break;
       }
 
@@ -424,11 +443,12 @@ function parseAndSchedule(script, ctx, canvas) {
         break;
       }
 
-      // Basic shapes (retained)
+      // Basic shapes (retained; now allow id=)
       case "circle": {
         const [x, y, r] = parts.slice(1, 4).map(Number);
         const color = parts.includes("color") ? parts[parts.indexOf("color") + 1] : "#FFF";
-        const shape = { type: "circle", x, y, r, color };
+        const id = getId();
+        const shape = { type: "circle", id, x, y, r, color };
         DRAWN_OBJECTS.push(shape);
         timeline.push({ type: "draw", shape: "circle", ...shape, time: currentTime });
         break;
@@ -436,7 +456,8 @@ function parseAndSchedule(script, ctx, canvas) {
       case "rect": {
         const [x, y, w, h] = parts.slice(1, 5).map(Number);
         const color = parts.includes("color") ? parts[parts.indexOf("color") + 1] : "#FFF";
-        const shape = { type: "rect", x, y, w, h, color };
+        const id = getId();
+        const shape = { type: "rect", id, x, y, w, h, color };
         DRAWN_OBJECTS.push(shape);
         timeline.push({ type: "draw", shape: "rect", ...shape, time: currentTime });
         break;
@@ -445,48 +466,46 @@ function parseAndSchedule(script, ctx, canvas) {
         const [x1, y1, x2, y2] = parts.slice(1, 5).map(Number);
         const color = parts.includes("color") ? parts[parts.indexOf("color") + 1] : "#FFF";
         const width = parts.includes("width") ? parseFloat(parts[parts.indexOf("width") + 1]) : 1;
-        const shape = { type: "line", x1, y1, x2, y2, width, color };
+        const id = getId();
+        const shape = { type: "line", id, x1, y1, x2, y2, width, color };
         DRAWN_OBJECTS.push(shape);
         timeline.push({ type: "draw", shape: "line", ...shape, time: currentTime });
         break;
       }
 
-      // Generative retained shapes
+      // New generative shapes
       case "blob": {
-        // blob x y r points jitter color #RRGGBB
-        const x = parseFloat(parts[1]);
-        const y = parseFloat(parts[2]);
-        const r = parseFloat(parts[3]);
-        const points = parseInt(parts[4]) || 16;
-        const jitter = parseFloat(parts[5]) || 0.25;
-        const color = parts.includes("color") ? parts[parts.indexOf("color")+1] : "#ffffff";
-        if (!Number.isFinite(x+y+r) || points < 3) throw new Error("blob expects: blob x y r points jitter color #hex");
-        DRAWN_OBJECTS.push({ type:"blob", x, y, r, points, jitter, color });
-        timeline.push({ type:"draw", shape:"blob", time: currentTime });
+        // blob x y r points jitter color #hex [id=name] [speed s]
+        const [x,y,r,points,jitter] = parts.slice(1,6).map(Number);
+        const color = parts.includes("color") ? parts[parts.indexOf("color")+1] : "#77ffaa";
+        const id = getId();
+        const speed = parseFloat(kvPairs.speed||"0.4");
+        const phase = randRange(0,Math.PI*2);
+        const shape = { type:"blob", id, x, y, r, points, jitter, color, speed, phase };
+        DRAWN_OBJECTS.push(shape);
+        timeline.push({ type:"draw", shape:"blob", ...shape, time: currentTime });
         break;
       }
       case "star": {
-        // star x y rOuter rInner points color #hex [rot deg]
-        const x = parseFloat(parts[1]), y = parseFloat(parts[2]);
-        const R = parseFloat(parts[3]), r = parseFloat(parts[4]);
-        const points = parseInt(parts[5]) || 5;
-        const color = parts.includes("color") ? parts[parts.indexOf("color")+1] : "#ffffff";
-        const rotIdx = parts.indexOf("rot");
-        const rot = rotIdx !== -1 ? parseFloat(parts[rotIdx+1]) : 0;
-        DRAWN_OBJECTS.push({ type:"star", x, y, R, r, points, color, rot });
-        timeline.push({ type:"draw", shape:"star", time: currentTime });
+        // star x y rOuter rInner points color #hex [id=..] [rot deg]
+        const [x,y,rO,rI,pts] = parts.slice(1,6).map(Number);
+        const color = parts.includes("color") ? parts[parts.indexOf("color")+1] : "#ffd84a";
+        const id = getId();
+        const rot = parseFloat(kvPairs.rot||"0");
+        const shape = { type:"star", id, x, y, rOuter:rO, rInner:rI, points:pts, color, rot };
+        DRAWN_OBJECTS.push(shape);
+        timeline.push({ type:"draw", shape:"star", ...shape, time: currentTime });
         break;
       }
       case "poly": {
-        // poly x y radius sides color #hex [rot deg]
-        const x = parseFloat(parts[1]), y = parseFloat(parts[2]);
-        const radius = parseFloat(parts[3]);
-        const sides = parseInt(parts[4]) || 6;
-        const color = parts.includes("color") ? parts[parts.indexOf("color")+1] : "#ffffff";
-        const rotIdx = parts.indexOf("rot");
-        const rot = rotIdx !== -1 ? parseFloat(parts[rotIdx+1]) : 0;
-        DRAWN_OBJECTS.push({ type:"poly", x, y, radius, sides, color, rot });
-        timeline.push({ type:"draw", shape:"poly", time: currentTime });
+        // poly x y radius sides color #hex [id=..] [rot deg]
+        const [x,y,rad,sides] = parts.slice(1,5).map(Number);
+        const color = parts.includes("color") ? parts[parts.indexOf("color")+1] : "#a0c";
+        const id = getId();
+        const rot = parseFloat(kvPairs.rot||"0");
+        const shape = { type:"poly", id, x, y, radius:rad, sides, color, rot };
+        DRAWN_OBJECTS.push(shape);
+        timeline.push({ type:"draw", shape:"poly", ...shape, time: currentTime });
         break;
       }
 
@@ -514,7 +533,7 @@ function parseAndSchedule(script, ctx, canvas) {
         break;
       }
 
-      // Procedural sprite turtle  (live sprite with optional id)
+      // Procedural sprite turtle (live sprite with optional id=)
       case "sprite": {
         const name = parts[1];         // turtle
         const action = parts[2] || ""; // crawling
@@ -526,9 +545,7 @@ function parseAndSchedule(script, ctx, canvas) {
         const scale = Number(kv.scale ?? 1);
         const color = kv.color || null;
         const id = kv.id || 'turtle';
-
         if (name !== "turtle") throw new Error(`unknown sprite: ${name}`);
-
         SPRITES[id] = { id, type: 'proc-turtle', x, y, scale, color, action, physics: false, playing: false };
         timeline.push({ type: "drawsprite", id, time: currentTime });
         break;
@@ -640,21 +657,34 @@ function parseAndSchedule(script, ctx, canvas) {
         break;
       }
 
-      // Wiggle
+      // Wiggle (now supports shapes and sprites via id)
       case "wiggle": {
         // wiggle <id> ampX ampY freq  OR  wiggle <id> amp freq
         const id = parts[1];
         const a2 = parseFloat(parts[2]);
         const a3 = parseFloat(parts[3]);
         const a4 = parseFloat(parts[4]);
-        if (!SPRITES[id]) break;
-        if (Number.isFinite(a2) && Number.isFinite(a3) && Number.isFinite(a4)) {
-          SPRITES[id].wiggle = { ampX: a2, ampY: a3, freq: a4 };
-        } else if (Number.isFinite(a2) && Number.isFinite(a3)) {
-          SPRITES[id].wiggle = { amp: a2, freq: a3 };
-        } else {
-          throw new Error("wiggle expects: wiggle <id> ampX ampY freq  OR  wiggle <id> amp freq");
+
+        // try sprites first
+        if (SPRITES[id]) {
+          if (Number.isFinite(a2) && Number.isFinite(a3) && Number.isFinite(a4)) {
+            SPRITES[id].wiggle = { ampX: a2, ampY: a3, freq: a4 };
+          } else if (Number.isFinite(a2) && Number.isFinite(a3)) {
+            SPRITES[id].wiggle = { amp: a2, freq: a3 };
+          } else throw new Error("wiggle expects: wiggle <id> ampX ampY freq  OR  wiggle <id> amp freq");
+          break;
         }
+        // then shapes by id
+        const obj = DRAWN_OBJECTS.find(o => o.id === id);
+        if (obj) {
+          if (Number.isFinite(a2) && Number.isFinite(a3) && Number.isFinite(a4)) {
+            obj.wiggle = { ampX: a2, ampY: a3, freq: a4 };
+          } else if (Number.isFinite(a2) && Number.isFinite(a3)) {
+            obj.wiggle = { amp: a2, freq: a3 };
+          } else throw new Error("wiggle expects: wiggle <id> ampX ampY freq  OR  wiggle <id> amp freq");
+          break;
+        }
+        console.warn("wiggle: no sprite or shape with id", id);
         break;
       }
 
@@ -746,6 +776,7 @@ function loop(now, ctx, canvas) {
   if (paused) return;
 
   const elapsed = now - startTime;
+  const timeSec = elapsed / 1000;
   const dtSec = Math.min(0.05, (now - (lastNow || now)) / 1000); // cap dt
   lastNow = now;
 
@@ -758,33 +789,22 @@ function loop(now, ctx, canvas) {
     const item = timeline.shift();
     switch (item.type) {
       case "background":
-        // keep CURRENT_BG as set by parser (string or noise object)
+        CURRENT_BG = item.color;
         break;
-
       case "draw":
-        // retained in DRAWN_OBJECTS already
         break;
-
       case "drawsprite":
-        // sprite already in SPRITES; nothing else to do
         break;
-
       case "sound":
         playTone(item.freq, item.dur);
         break;
-
       case "play":
         playTone(noteMap[item.note], Math.max(0.1, (60 / tempoBPM) * 0.9));
         break;
-
       case "sequence":
         playSequence(item.notes);
         break;
-
       case "animate":
-        animations.push({ ...item, start: now });
-        break;
-
       case "animatesprite":
         animations.push({ ...item, start: now });
         break;
@@ -795,99 +815,74 @@ function loop(now, ctx, canvas) {
   const w = canvas.width, h = canvas.height;
   ctx.clearRect(0, 0, w, h);
 
-  // background (solid or animated noise)
-  if (typeof CURRENT_BG === "string") {
-    ctx.fillStyle = CURRENT_BG;
+  // background (flat or animated noise)
+  if (BG_NOISE) {
+    BG_NOISE.phase += dtSec * BG_NOISE.speed;
+    // simple 2-color warped gradient using phase
+    const g = ctx.createLinearGradient(
+      0, 0,
+      w * (0.6 + 0.4*Math.sin(BG_NOISE.phase*0.7)),
+      h * (0.6 + 0.4*Math.cos(BG_NOISE.phase*0.9))
+    );
+    g.addColorStop(0, BG_NOISE.colors[0]);
+    g.addColorStop(1, BG_NOISE.colors[1]);
+    ctx.fillStyle = g;
     ctx.fillRect(0, 0, w, h);
-  } else if (CURRENT_BG && CURRENT_BG.type === "noise" && NOISE_BG) {
-    NOISE_BG.t += NOISE_BG.speed;
-    const cell = Math.max(2, Math.floor(NOISE_BG.scale * 0.25)); // pixel block for speed
-    const c1 = gHexToRgb(NOISE_BG.c1), c2 = gHexToRgb(NOISE_BG.c2);
-    for (let py=0; py<h; py+=cell){
-      for (let px=0; px<w; px+=cell){
-        const nx = (px / NOISE_BG.scale);
-        const ny = (py / NOISE_BG.scale);
-        const n = valueNoise2(nx + NOISE_BG.t, ny - NOISE_BG.t); // 0..1
-        const rgb = mixRGB(c1,c2,n);
-        ctx.fillStyle = gRgbToHex(rgb);
-        ctx.fillRect(px, py, cell, cell);
+
+    // optional grain overlay
+    const cells = Math.floor(60 * BG_NOISE.scale);
+    const cw = w/cells, ch = h/cells;
+    ctx.globalAlpha = 0.06;
+    for(let i=0;i<cells;i++){
+      for(let j=0;j<cells;j++){
+        const n = 0.5 + 0.5*Math.sin((i*1.7 + j*2.3)*0.35 + BG_NOISE.phase*2.0);
+        ctx.fillStyle = `rgba(255,255,255,${n})`;
+        ctx.fillRect(i*cw, j*ch, cw, ch);
       }
     }
+    ctx.globalAlpha = 1;
   } else {
-    ctx.fillStyle = "#000";
+    ctx.fillStyle = CURRENT_BG;
     ctx.fillRect(0, 0, w, h);
   }
 
-  // static shapes (retained)
+  // static/generative shapes (with optional wiggle)
   for (const obj of DRAWN_OBJECTS) {
+    let ox = 0, oy = 0;
+    if (obj.wiggle && startTime != null) {
+      const freq = obj.wiggle.freq || 1;
+      const ampX = obj.wiggle.ampX || obj.wiggle.amp || 0;
+      const ampY = obj.wiggle.ampY || obj.wiggle.amp || 0;
+      ox = Math.sin(timeSec * Math.PI * 2 * freq) * ampX;
+      oy = Math.cos(timeSec * Math.PI * 2 * freq) * ampY;
+    }
+
     if (obj.type === "circle") {
       ctx.beginPath();
-      ctx.arc(obj.x, obj.y, obj.r, 0, 2 * Math.PI);
+      ctx.arc(obj.x + ox, obj.y + oy, obj.r, 0, 2 * Math.PI);
       ctx.fillStyle = obj.color || "#FFF";
       ctx.fill();
     } else if (obj.type === "rect") {
       ctx.fillStyle = obj.color || "#FFF";
-      ctx.fillRect(obj.x, obj.y, obj.w, obj.h);
+      ctx.fillRect(obj.x + ox, obj.y + oy, obj.w, obj.h);
     } else if (obj.type === "line") {
       ctx.beginPath();
       ctx.strokeStyle = obj.color || "#FFF";
       ctx.lineWidth = obj.width || 1;
-      ctx.moveTo(obj.x1, obj.y1);
-      ctx.lineTo(obj.x2, obj.y2);
+      ctx.moveTo(obj.x1 + ox, obj.y1 + oy);
+      ctx.lineTo(obj.x2 + ox, obj.y2 + oy);
       ctx.stroke();
-    } else if (obj.type === "blob") {
-      const { x, y, r, points, jitter, color } = obj;
-      const saved = RNG_SEED;
-      srand((Math.abs((x|0)*73856093 ^ (y|0)*19349663) | 0) || 1);
-      const step = (Math.PI*2) / points;
-      const verts = [];
-      for (let i=0; i<points; i++){
-        const a = step*i;
-        const jr = 1 + randRange(-jitter, jitter);
-        const rr = Math.max(4, r * jr);
-        verts.push([ x + Math.cos(a)*rr, y + Math.sin(a)*rr ]);
-      }
-      ctx.beginPath();
-      ctx.moveTo(verts[0][0], verts[0][1]);
-      for (let i=1;i<verts.length;i++) ctx.lineTo(verts[i][0], verts[i][1]);
-      ctx.closePath();
-      ctx.fillStyle = color;
-      ctx.fill();
-      RNG_SEED = saved;
     } else if (obj.type === "star") {
-      const { x, y, R, r, points, color, rot=0 } = obj;
-      const step = Math.PI / points;
-      ctx.beginPath();
-      for (let i=0; i<points*2; i++){
-        const a = rot*Math.PI/180 + i*step;
-        const rad = (i%2===0) ? R : r;
-        const px = x + Math.cos(a)*rad;
-        const py = y + Math.sin(a)*rad;
-        if (i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py);
-      }
-      ctx.closePath();
-      ctx.fillStyle = color;
-      ctx.fill();
+      drawStar(ctx, obj.x + ox, obj.y + oy, obj.rOuter, obj.rInner, obj.points, obj.color, obj.rot || 0);
     } else if (obj.type === "poly") {
-      const { x, y, radius, sides, color, rot=0 } = obj;
-      const step = (Math.PI*2) / sides;
-      ctx.beginPath();
-      for (let i=0; i<sides; i++){
-        const a = rot*Math.PI/180 + i*step;
-        const px = x + Math.cos(a)*radius;
-        const py = y + Math.sin(a)*radius;
-        if (i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py);
-      }
-      ctx.closePath();
-      ctx.fillStyle = color;
-      ctx.fill();
+      drawPoly(ctx, obj.x + ox, obj.y + oy, obj.radius, obj.sides, obj.color, obj.rot || 0);
+    } else if (obj.type === "blob") {
+      drawBlob(ctx, { ...obj, x: obj.x + ox, y: obj.y + oy }, timeSec);
     }
   }
 
-  // live sprites (image/sheet/proc-turtle) drawn every frame
-  for (const id in SPRITES) {
-    drawSprite(ctx, SPRITES[id]);
-  }
+  // live sprites (image/sheet/proc-turtle)
+  for (const id in SPRITES) drawSprite(ctx, SPRITES[id]);
 
   // Active animations (shapes and sprites)
   animations = animations.filter(anim => {
@@ -927,7 +922,6 @@ function loop(now, ctx, canvas) {
       s.y = y1 + (y2 - y1) * t;
       s.scale = sc1 + (sc2 - sc1) * t;
     }
-
     return t < 1;
   });
 
@@ -964,31 +958,19 @@ function runFromText(code) {
 function renderInitial() {
   const canvas = document.getElementById("canvas");
   const ctx = canvas.getContext("2d");
-  const w = canvas.width, h = canvas.height;
-
-  // background (single frame)
-  if (typeof CURRENT_BG === "string") {
-    ctx.fillStyle = CURRENT_BG;
-    ctx.fillRect(0, 0, w, h);
-  } else if (CURRENT_BG && CURRENT_BG.type === "noise" && NOISE_BG) {
-    const cell = Math.max(2, Math.floor(NOISE_BG.scale * 0.25));
-    const c1 = gHexToRgb(NOISE_BG.c1), c2 = gHexToRgb(NOISE_BG.c2);
-    for (let py=0; py<h; py+=cell){
-      for (let px=0; px<w; px+=cell){
-        const nx = (px / NOISE_BG.scale);
-        const ny = (py / NOISE_BG.scale);
-        const n = valueNoise2(nx, ny);
-        const rgb = mixRGB(c1,c2,n);
-        ctx.fillStyle = gRgbToHex(rgb);
-        ctx.fillRect(px, py, cell, cell);
-      }
-    }
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  if (BG_NOISE) {
+    // draw once
+    const w=canvas.width, h=canvas.height;
+    const g = ctx.createLinearGradient(0,0,w,h);
+    g.addColorStop(0, BG_NOISE.colors[0]);
+    g.addColorStop(1, BG_NOISE.colors[1]);
+    ctx.fillStyle = g;
+    ctx.fillRect(0,0,w,h);
   } else {
-    ctx.fillStyle = "#000";
-    ctx.fillRect(0, 0, w, h);
+    ctx.fillStyle = CURRENT_BG;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
   }
-
-  // retained shapes
   for (const obj of DRAWN_OBJECTS) {
     if (obj.type === "circle") {
       ctx.beginPath();
@@ -1005,85 +987,173 @@ function renderInitial() {
       ctx.moveTo(obj.x1, obj.y1);
       ctx.lineTo(obj.x2, obj.y2);
       ctx.stroke();
-    } else if (obj.type === "blob" || obj.type === "star" || obj.type === "poly") {
-      // Use the same drawing as in loop for consistency
-      // quick path: call loop’s retained drawing by simulating once
-      // To keep code simple, duplicate drawing:
-      if (obj.type === "blob") {
-        const { x, y, r, points, jitter, color } = obj;
-        const saved = RNG_SEED;
-        srand((Math.abs((x|0)*73856093 ^ (y|0)*19349663) | 0) || 1);
-        const step = (Math.PI*2) / points;
-        const verts = [];
-        for (let i=0; i<points; i++){
-          const a = step*i;
-          const jr = 1 + randRange(-jitter, jitter);
-          const rr = Math.max(4, r * jr);
-          verts.push([ x + Math.cos(a)*rr, y + Math.sin(a)*rr ]);
-        }
-        ctx.beginPath();
-        ctx.moveTo(verts[0][0], verts[0][1]);
-        for (let i=1;i<verts.length;i++) ctx.lineTo(verts[i][0], verts[i][1]);
-        ctx.closePath();
-        ctx.fillStyle = color;
-        ctx.fill();
-        RNG_SEED = saved;
-      } else if (obj.type === "star") {
-        const { x, y, R, r, points, color, rot=0 } = obj;
-        const step = Math.PI / points;
-        ctx.beginPath();
-        for (let i=0; i<points*2; i++){
-          const a = rot*Math.PI/180 + i*step;
-          const rad = (i%2===0) ? R : r;
-          const px = x + Math.cos(a)*rad;
-          const py = y + Math.sin(a)*rad;
-          if (i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py);
-        }
-        ctx.closePath();
-        ctx.fillStyle = color;
-        ctx.fill();
-      } else if (obj.type === "poly") {
-        const { x, y, radius, sides, color, rot=0 } = obj;
-        const step = (Math.PI*2) / sides;
-        ctx.beginPath();
-        for (let i=0; i<sides; i++){
-          const a = rot*Math.PI/180 + i*step;
-          const px = x + Math.cos(a)*radius;
-          const py = y + Math.sin(a)*radius;
-          if (i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py);
-        }
-        ctx.closePath();
-        ctx.fillStyle = color;
-        ctx.fill();
-      }
+    } else if (obj.type === "star") {
+      drawStar(ctx, obj.x, obj.y, obj.rOuter, obj.rInner, obj.points, obj.color, obj.rot||0);
+    } else if (obj.type === "poly") {
+      drawPoly(ctx, obj.x, obj.y, obj.radius, obj.sides, obj.color, obj.rot||0);
+    } else if (obj.type === "blob") {
+      drawBlob(ctx, obj, 0);
     }
   }
 }
 
+// ---------- NL → DSL (CPU-light, rule-based but rich) ----------
+const COLOR_WORDS = {
+  red:"#FF3B30", green:"#34C759", blue:"#0A84FF", yellow:"#FFD60A", purple:"#BF5AF2",
+  white:"#FFFFFF", black:"#000000", pink:"#FF2D55", orange:"#FF9F0A", cyan:"#32ADE6"
+};
+const PALETTES = {
+  neon: ["#13F1FF","#00E1B4","#FF3CAC","#784BA0","#FAFF00"],
+  pastel: ["#A3E4DB","#F9D5E5","#E2F0CB","#B5EAEA","#FFCFDF"],
+  synth: ["#3A0CA3","#7209B7","#F72585","#4CC9F0","#4361EE"]
+};
+function pickPalette(name){ const p = PALETTES[name]; if(!p) return null; return [...p]; }
+
+function naturalToDSL(input){
+  const txt = input.toLowerCase().trim();
+  const dsl = [];
+  const w = 800, h = 600;
+
+  // defaults
+  dsl.push(`canvas ${w} ${h}`);
+
+  // seed
+  const seedMatch = txt.match(/seed\s*(\d+)/);
+  if (seedMatch) dsl.push(`seed ${parseInt(seedMatch[1],10)}`);
+
+  // speed / tempo
+  const slow = /\bslow(ly)?\b/.test(txt);
+  const fast = /\bfast\b/.test(txt);
+  const tempo = slow?60: fast?140: 100;
+  dsl.push(`tempo ${tempo}`);
+
+  // palette / background
+  let palette = null;
+  if (/\bneon\b/.test(txt)) palette = pickPalette("neon");
+  else if (/\bpastel\b/.test(txt)) palette = pickPalette("pastel");
+  else if (/\bsynth(wave)?\b/.test(txt)) palette = pickPalette("synth");
+
+  if (/\b(noise|grain|texture|atmosphere|atmospheric)\b/.test(txt)) {
+    const c1 = palette ? palette[Math.floor(RNG()*palette.length)] : "#0b1022";
+    const c2 = palette ? palette[Math.floor(RNG()*palette.length)] : "#1c2a4a";
+    dsl.push(`backgroundnoise 1.2 ${slow?0.08:0.18} color ${c1} ${c2}`);
+  } else {
+    dsl.push(`background ${palette ? palette[0] : "#000000"}`);
+  }
+
+  // counts & shapes
+  const count = Math.max(1, parseInt((txt.match(/(\d+)\s+(blob|star|poly|polygon|circle|square|rect)/)||[])[1]||0,10)) || (/\bseveral|many\b/.test(txt)?8: /\bfew\b/.test(txt)?3: 1);
+  const hasTurtle = /turtle/.test(txt);
+  const wantBlobs = /blob|organic|amoeba|wobbly/.test(txt);
+  const wantStars = /star/.test(txt);
+  const wantPoly  = /poly(gon)?/.test(txt);
+  const wantCircles = /circle/.test(txt);
+  const wantRects   = /(rect|square)/.test(txt);
+
+  const drift = /\bdrift(ing)?\b/.test(txt) || /\bfloating?\b/.test(txt) || /\bbob(bing)?\b/.test(txt);
+  const wiggle = /\bwiggl(ing|y)?\b/.test(txt);
+
+  const leftToRight = /(left\s*to\s*right|across)/.test(txt);
+  const rightToLeft = /(right\s*to\s*left)/.test(txt);
+
+  // build scene objects
+  const spacing = w/(count+1);
+  for (let i=0;i<count;i++){
+    const cx = Math.round(spacing*(i+1));
+    const cy = Math.round(h*0.5 + Math.sin(i)*60);
+    const color = palette ? palette[i%palette.length] :
+      (COLOR_WORDS[(txt.match(/\b(red|green|blue|yellow|purple|white|black|pink|orange|cyan)\b/)||[])[1]] || "#FFFFFF");
+
+    if (wantBlobs) {
+      const r = randRange(30, 70);
+      const points = Math.floor(randRange(12, 22));
+      const jitter = r*randRange(0.2, 0.45);
+      const speed = slow?0.15:fast?0.5:0.3;
+      const id = `blob${i+1}`;
+      dsl.push(`blob ${cx} ${cy} ${Math.round(r)} ${points} ${Math.round(jitter)} color ${color} id=${id} speed ${speed}`);
+      if (wiggle) dsl.push(`wiggle ${id} ${Math.round(randRange(4,16))} ${Math.round(randRange(4,16))} ${randRange(0.15,0.5).toFixed(2)}`);
+    } else if (wantStars) {
+      const rO = randRange(35,70), rI = rO*randRange(0.35,0.55);
+      const pts = Math.floor(randRange(5,8));
+      const id = `star${i+1}`;
+      dsl.push(`star ${cx} ${cy} ${Math.round(rO)} ${Math.round(rI)} ${pts} color ${color} id=${id} rot ${Math.round(randRange(0,45))}`);
+      if (wiggle) dsl.push(`wiggle ${id} ${Math.round(randRange(3,10))} ${Math.round(randRange(3,10))} ${randRange(0.2,0.6).toFixed(2)}`);
+    } else if (wantPoly) {
+      const rad = randRange(30,70);
+      const sides = Math.floor(randRange(5,8));
+      const id = `poly${i+1}`;
+      dsl.push(`poly ${cx} ${cy} ${Math.round(rad)} ${sides} color ${color} id=${id} rot ${Math.round(randRange(0,45))}`);
+      if (wiggle) dsl.push(`wiggle ${id} ${Math.round(randRange(2,12))} ${Math.round(randRange(2,12))} ${randRange(0.2,0.6).toFixed(2)}`);
+    } else if (wantCircles) {
+      dsl.push(`circle ${cx} ${cy} ${Math.round(randRange(24,50))} color ${color} id=c${i+1}`);
+      if (wiggle) dsl.push(`wiggle c${i+1} ${Math.round(randRange(3,10))} ${Math.round(randRange(3,10))} ${randRange(0.2,0.6).toFixed(2)}`);
+    } else if (wantRects) {
+      dsl.push(`rect ${cx-25} ${cy-25} 50 50 color ${color} id=r${i+1}`);
+      if (wiggle) dsl.push(`wiggle r${i+1} ${Math.round(randRange(3,10))} ${Math.round(randRange(3,10))} ${randRange(0.2,0.6).toFixed(2)}`);
+    }
+  }
+
+  if (hasTurtle) {
+    dsl.push(`sprite turtle crawling x=80 y=520 scale=1 id=t1`);
+    const toX = rightToLeft? 80 : 720;
+    const fromX = rightToLeft? 720 : 80;
+    const dur = slow?10:fast?5:8;
+    dsl.push(`animate sprite t1 ${fromX} 520 1 -> ${toX} 520 1 duration ${dur}s ease in-out`);
+    if (slow) dsl.push(`sequence { C3 E3 G3 }`);
+    else if (fast) dsl.push(`sequence { C4 E4 G4 C5 }`);
+    else dsl.push(`sequence { C4 D4 E4 }`);
+  }
+
+  // drift across?
+  if ((leftToRight || rightToLeft) && !hasTurtle && count>0) {
+    const ids = dsl.filter(l=>/ id=/.test(l)).map(l=>l.match(/id=([a-z0-9]+)/i)[1]);
+    const dur = slow?12:fast?6:9;
+    const fromX = rightToLeft ? 780 : 20;
+    const toX   = rightToLeft ? 20 : 780;
+    ids.forEach((id,idx)=>{
+      const y = 120 + (idx % 8)*50;
+      dsl.push(`animate sprite ${id} ${fromX} ${y} 1 -> ${toX} ${y} 1 duration ${dur}s ease in-out`);
+    });
+  }
+
+  // fallback: if no shapes recognized, make a neon blob trio
+  if (!dsl.some(l=>/^(blob|star|poly|circle|rect|sprite)/.test(l))) {
+    const pal = palette || pickPalette("neon");
+    dsl.push(`backgroundnoise 1.2 ${slow?0.08:0.18} color ${pal[0]} ${pal[1]}`);
+    const xs = [200,400,600], cs = [pal[2], pal[3], pal[4]];
+    for(let i=0;i<3;i++){
+      dsl.push(`blob ${xs[i]} 300 50 18 18 color ${cs[i]} id=b${i+1} speed ${slow?0.12:0.28}`);
+      if (wiggle) dsl.push(`wiggle b${i+1} 6 6 0.3`);
+    }
+  }
+
+  return dsl.join("\n");
+}
+
+// ------------------------------
+// Public API exposure
+// ------------------------------
 window.ShapeSound = {
-  // Primary entry point used by index.html
+  // Primary entry point
   async loadFromText(code) { runFromText(code || ""); },
-  // Alias(es) for flexibility
+  // Aliases
   async parseAndRun(code) { runFromText(code || ""); },
   async run(code) { runFromText(code || ""); },
 
   // Playback controls
   play() {
-    // Make Play act as "start or resume"
     paused = false;
     startTime = performance.now() - (pauseOffset || 0);
     lastNow = startTime;
     const canvas = document.getElementById("canvas");
     const ctx = canvas.getContext("2d");
-    requestAnimationFrame(now => {
-      if (!paused) loop(now, ctx, canvas);
-    });
+    requestAnimationFrame(now => { if (!paused) loop(now, ctx, canvas); });
   },
   pause() { paused = true; },
   resume() { this.play(); },
   seek(percent01) {
     if (!currentScene.duration) return;
-    percent01 = Math.min(Math.max(percent01, 0), 1);
+    percent01 = clamp01(percent01||0);
     pauseOffset = currentScene.duration * 1000 * percent01;
     paused = true;
     const scrubber = document.getElementById("timeline-scrubber");
@@ -1091,7 +1161,7 @@ window.ShapeSound = {
   },
   render: renderInitial,
   // expose internals (optional)
-  _state: () => ({ tempoBPM, CURRENT_BG, NOISE_BG, DRAWN_OBJECTS, timeline, animations, SPRITES })
+  _state: () => ({ tempoBPM, CURRENT_BG, BG_NOISE, DRAWN_OBJECTS, timeline, animations, SPRITES, SEED })
 };
 
 // ------------------------------
@@ -1125,97 +1195,51 @@ document.addEventListener("DOMContentLoaded", () => {
     window.ShapeSound.seek(isFinite(val) ? val : 0);
   });
 
-  // Natural Prompt → Script (rule-based quick gen; TinyGPT handled in tinygpt.js via Generate button)
+  // --- Replace the basic converter with the richer NL parser ---
   document.getElementById("convert-prompt")?.addEventListener("click", () => {
-    const input = document.getElementById("natural-prompt").value.toLowerCase().trim();
-    const output = [];
-    const colors = {
-      red: "#FF0000", green: "#00FF00", blue: "#0000FF",
-      yellow: "#FFFF00", purple: "#AA00FF", white: "#FFFFFF", black: "#000000"
-    };
-
-    const simpleMatch = input.match(/(\d+)\s+(red|green|blue|yellow|purple|white|black)\s+(circle|square|rect|rectangle)/);
-    const turtleMatch = /turtle.*crawling/.test(input);
-    const slowMatch = /slow (note|notes|music|tempo)/.test(input);
-    const fastMatch = /fast (note|notes|music|tempo)/.test(input);
-
-    if (turtleMatch) {
-      output.push("canvas 800 600");
-      output.push("backgroundnoise 80 0.02 color #001122 #123456");
-      output.push("tempo " + (slowMatch ? 50 : fastMatch ? 140 : 100));
-      output.push("sprite turtle crawling x=80 y=520 scale=1");
-      output.push("animate sprite turtle 80 520 1 -> 720 520 1 duration 8s ease in-out");
-      if (slowMatch) {
-        output.push("sequence { C3 E3 G3 }");
-      } else if (fastMatch) {
-        output.push("sequence { C4 E4 G4 C5 }");
-      } else {
-        output.push("sequence { C4 D4 E4 }");
-      }
-      output.push("seed 7");
-      output.push("blob 300 200 60 20 0.25 color #f3c4fb");
-      output.push("star 540 180 55 25 8 color #ffd166 rot 12");
-    } else if (simpleMatch) {
-      const count = parseInt(simpleMatch[1]);
-      const color = colors[simpleMatch[2]];
-      const shape = simpleMatch[3];
-      const spacing = 800 / (count + 1);
-
-      output.push("canvas 800 600");
-      output.push("backgroundnoise 70 0.02 color #000000 #20203a");
-      for (let i = 0; i < count; i++) {
-        if (shape.startsWith("circle")) {
-          output.push(`circle ${Math.round(spacing * (i + 1))} 300 40 color ${color}`);
-        } else {
-          output.push(`rect ${Math.round(spacing * (i + 1) - 20)} 280 40 40 color ${color}`);
-        }
-      }
-      output.push("seed 42");
-      output.push("blob 400 140 50 18 0.3 color #88ffcc");
-    } else {
-      output.push("// Unsupported prompt. Try 'turtle crawling with slow notes' or '4 white squares'.");
-    }
-
-    document.getElementById("code").value = output.join("\n");
+    const input = document.getElementById("natural-prompt").value;
+    const dsl = naturalToDSL(input || "");
+    codeArea.value = dsl;
   });
 
-  // Example Picker
+  // Example Picker (updated to show generative bits)
   document.getElementById("example-picker")?.addEventListener("change", (e) => {
     const val = e.target.value;
     const examples = {
       example1: `canvas 800 600
-backgroundnoise 80 0.02 color #0b0f1a #1b2238
-seed 42
-blob 220 310 90 22 0.35 color #8ef1ff
-blob 420 320 70 18 0.28 color #ffd08e
-blob 600 280 60 16 0.30 color #c6ff8e
-animate circle 200 200 10 -> 600 200 80 duration 6s fromColor #ff0088 toColor #88ffcc ease in-out`,
-      example2: `canvas 800 600
-backgroundnoise 80 0.02 color #1b2238 #3c486b
+backgroundnoise 1.2 0.18 color #0b1022 #1c2a4a
 seed 7
-star 200 300 80 35 10 color #ffd166 rot 12
-poly 600 300 70 7 color #06d6a0 rot 0
-animate rect 100 450 40 -> 700 450 140 duration 5s fromColor #ff006e toColor #8338ec ease in-out`,
+blob 200 300 50 18 18 color #13F1FF id=b1 speed 0.28
+blob 400 300 56 20 22 color #00E1B4 id=b2 speed 0.28
+blob 600 300 44 16 16 color #FF3CAC id=b3 speed 0.28
+wiggle b1 6 4 0.35
+wiggle b2 8 6 0.25
+wiggle b3 5 7 0.30`,
+      example2: `canvas 800 600
+background #111
+poly 200 300 60 6 color #FF00FF id=p1 rot 15
+star 400 300 70 28 7 color #00FFFF id=s1 rot 0
+poly 600 300 50 5 color #FFFF00 id=p2 rot -10
+wiggle p1 6 6 0.4
+wiggle s1 4 8 0.3
+wiggle p2 6 6 0.5`,
       example3: `canvas 800 600
-backgroundnoise 70 0.03 color #001022 #002a44
+backgroundnoise 1.2 0.12 color #0b1022 #1c2a4a
 tempo 60
-sprite turtle crawling x=100 y=520 scale=1
-animate sprite turtle 100 520 1 -> 700 520 1 duration 8s ease in-out
-seed 9
-blob 300 160 60 20 0.25 color #f3c4fb
-star 520 150 55 25 8 color #ffd166
+sprite turtle crawling x=100 y=520 scale=1 id=t1
+animate sprite t1 100 520 1 -> 700 520 1 duration 8s ease in-out
 sequence { C3 E3 G3 }`
     };
     document.getElementById("code").value = examples[val] || "";
   });
 
-  // Help Toggle
+  // Help Toggle (unchanged)
   document.getElementById("help-toggle")?.addEventListener("click", () => {
     const panel = document.getElementById("help-panel");
     panel.style.display = panel.style.display === "none" ? "block" : "none";
   });
 
-  // Saved Scenes
+  // Saved Scenes (unchanged)
   function updateSavedScenes() {
     const dropdown = document.getElementById("saved-scenes");
     if (!dropdown) return;
@@ -1253,15 +1277,13 @@ sequence { C3 E3 G3 }`
   });
   updateSavedScenes();
 
-  // Export PNG
+  // Export PNG / Copy (unchanged)
   document.getElementById("export-png")?.addEventListener("click", () => {
     const link = document.createElement("a");
     link.download = "shapesound.png";
     link.href = canvas.toDataURL("image/png");
     link.click();
   });
-
-  // Copy Code
   document.getElementById("copy-code")?.addEventListener("click", () => {
     navigator.clipboard.writeText(document.getElementById("code").value).then(() => {
       alert("Code copied to clipboard!");
