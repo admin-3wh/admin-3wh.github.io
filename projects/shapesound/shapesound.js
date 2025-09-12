@@ -1,4 +1,3 @@
-// projects/shapesound/shapesound.js
 // NOTE: index.html should include this with: <script type="module" src="shapesound.js"></script>
 
 // TinyGPT is loaded separately and exposed as window.TinyGPT by tinygpt.js.
@@ -278,6 +277,27 @@ function drawBlob(ctx, obj, timeSec){
 }
 
 // ------------------------------
+// Fields & Behaviors (NEW)
+// ------------------------------
+const FIELDS = {}; // id -> {type, ...params}
+
+function fieldVelocity(f, x, y, t){
+  if(!f) return {vx:0, vy:0};
+  if(f.type === 'noise'){
+    const ang = Math.sin((x*(f.scale||0.005)) + t*(f.speed||0.25))*1.7
+              + Math.cos((y*(f.scale||0.005)) - t*(f.speed||0.25)*1.3)*1.3;
+    return { vx: Math.cos(ang)*(f.strength||40), vy: Math.sin(ang)*(f.strength||40) };
+  }
+  if(f.type === 'attractor'){
+    const dx = (f.x||400) - x, dy = (f.y||300) - y;
+    const d = Math.hypot(dx,dy) + 1e-3;
+    const k = (f.strength||60) / Math.pow(d, 1 + (f.falloff ?? 0.8));
+    return { vx: dx*k, vy: dy*k };
+  }
+  return {vx:0,vy:0};
+}
+
+// ------------------------------
 // Sprite drawing with wiggle + fallbacks
 // ------------------------------
 function drawSpriteFallback(ctx, s, x, y) {
@@ -395,6 +415,7 @@ function parseAndSchedule(script, ctx, canvas) {
   tempoBPM = 100;
   for (const k in SPRITES) delete SPRITES[k];
   setSeed(SEED); // maintain seed
+  for (const f in FIELDS) delete FIELDS[f]; // reset fields
 
   PHYSICS.enabled = false;
   PHYSICS.gravity = { x: 0, y: 0 };
@@ -495,7 +516,6 @@ function parseAndSchedule(script, ctx, canvas) {
         const shape = { type: "line", id, x1, y1, x2, y2, width, color };
         DRAWN_OBJECTS.push(shape);
         timeline.push({ type: "draw", shape: "line", ...shape, time: currentTime });
-        // lines are not mirrored as sprites by default (rarely animated); can be added if needed
         break;
       }
 
@@ -535,6 +555,58 @@ function parseAndSchedule(script, ctx, canvas) {
         DRAWN_OBJECTS.push(shape);
         timeline.push({ type:"draw", shape:"poly", ...shape, time: currentTime });
         if (id) SPRITES[id] = { id, type: 'genshape', ref: shape, x, y, scale: 1 };
+        break;
+      }
+
+      // Fields & Behaviors (NEW)
+      case "field": {
+        // field noise id=f1 scale 0.006 speed 0.22 strength 35
+        // field attractor id=f2 x 400 y 300 strength 60 falloff 0.8
+        const type = parts[1];
+        const kv = Object.fromEntries(parts.slice(2).filter(p=>p.includes("=")).map(p=>p.split("=")));
+        const id = kv.id || `f${Object.keys(FIELDS).length+1}`;
+        if (type === "noise") {
+          FIELDS[id] = {
+            id, type: 'noise',
+            scale: parseFloat(kv.scale || "0.005"),
+            speed: parseFloat(kv.speed || "0.25"),
+            strength: parseFloat(kv.strength || "40")
+          };
+        } else if (type === "attractor") {
+          FIELDS[id] = {
+            id, type: 'attractor',
+            x: parseFloat(kv.x || "400"),
+            y: parseFloat(kv.y || "300"),
+            strength: parseFloat(kv.strength || "60"),
+            falloff: parseFloat(kv.falloff || "0.8")
+          };
+        } else {
+          throw new Error("unknown field type");
+        }
+        break;
+      }
+      case "behavior": {
+        // behavior <id> use f1 mix 0.7
+        // behavior <id> orbit cx cy radius speed
+        const targetId = parts[1];
+        const tgt = SPRITES[targetId] || DRAWN_OBJECTS.find(o=>o.id===targetId);
+        if(!tgt){ console.warn("behavior target not found", targetId); break; }
+        if (parts.includes("use")) {
+          const fId = parts[parts.indexOf("use")+1];
+          const mix = parts.includes("mix") ? parseFloat(parts[parts.indexOf("mix")+1]) : 1.0;
+          tgt.behavior = { mode:'field', fieldId:fId, mix: isFinite(mix)?mix:1.0 };
+        } else if (parts[2] === "orbit") {
+          const cx = parseFloat(parts[3]), cy = parseFloat(parts[4]);
+          const radius = parseFloat(parts[5]), speed = parseFloat(parts[6]||"0.6");
+          tgt.behavior = { mode:'orbit', cx, cy, radius, speed, theta: RNG()*Math.PI*2 };
+        }
+        break;
+      }
+      case "drift": {
+        // drift <id> ampX ampY freq   (alias for wiggle)
+        const id = parts[1]; const ax = parseFloat(parts[2]), ay = parseFloat(parts[3]), f = parseFloat(parts[4]);
+        const s = SPRITES[id] || DRAWN_OBJECTS.find(o=>o.id===id);
+        if(s) s.wiggle = { ampX:ax, ampY:ay, freq:f };
         break;
       }
 
@@ -840,6 +912,28 @@ function loop(now, ctx, canvas) {
     }
   }
 
+  // -------- Apply behaviors (NEW) before drawing --------
+  const t = timeSec;
+  function applyBehaviorTo(obj, dt){
+    const b = obj.behavior; if(!b) return;
+    // Only objects with x/y get behaviors (lines are skipped)
+    if (typeof obj.x !== "number" || typeof obj.y !== "number") return;
+
+    if (b.mode === 'field'){
+      const f = FIELDS[b.fieldId];
+      const {vx,vy} = fieldVelocity(f, obj.x, obj.y, t);
+      const mix = clamp01(b.mix ?? 1.0);
+      obj.x += vx * mix * dt;
+      obj.y += vy * mix * dt;
+    } else if (b.mode === 'orbit'){
+      b.theta = (b.theta ?? 0) + (b.speed ?? 0.6) * dt;
+      obj.x = b.cx + Math.cos(b.theta)*b.radius;
+      obj.y = b.cy + Math.sin(b.theta)*b.radius;
+    }
+  }
+  for (const o of DRAWN_OBJECTS) applyBehaviorTo(o, dtSec);
+  for (const sid in SPRITES) applyBehaviorTo(SPRITES[sid], dtSec);
+
   // Clear and redraw the retained scene every frame
   const w = canvas.width, h = canvas.height;
   ctx.clearRect(0, 0, w, h);
@@ -1137,6 +1231,13 @@ function naturalToDSL(input){
     else dsl.push(`sequence { C4 D4 E4 }`);
   }
 
+  // attach a smooth flow field + behaviors when wiggle/drift is requested
+  if ((wiggle || drift) && !hasTurtle && count>0) {
+    dsl.push(`field noise id=f1 scale ${slow?0.004:fast?0.008:0.006} speed ${slow?0.14:fast?0.3:0.22} strength ${slow?25:fast?45:35}`);
+    const ids1 = dsl.filter(l=>/ id=/.test(l)).map(l=>l.match(/id=([a-z0-9]+)/i)[1]);
+    ids1.forEach(id => dsl.push(`behavior ${id} use f1 mix 0.8`));
+  }
+
   // drift across? (works now because shapes are mirrored as live genshape sprites with same ids)
   if ((leftToRight || rightToLeft || drift) && !hasTurtle && count>0) {
     const ids = dsl.filter(l=>/ id=/.test(l)).map(l=>l.match(/id=([a-z0-9]+)/i)[1]);
@@ -1158,6 +1259,9 @@ function naturalToDSL(input){
       dsl.push(`blob ${xs[i]} 300 50 18 18 color ${cs[i]} id=b${i+1} speed ${slow?0.12:0.28}`);
       if (wiggle) dsl.push(`wiggle b${i+1} 6 6 0.3`);
     }
+    // give them life anyway
+    dsl.push(`field noise id=f1 scale 0.006 speed 0.22 strength 35`);
+    ['b1','b2','b3'].forEach(id => dsl.push(`behavior ${id} use f1 mix 0.8`));
   }
 
   return dsl.join("\n");
@@ -1194,7 +1298,7 @@ window.ShapeSound = {
   },
   render: renderInitial,
   // expose internals (optional)
-  _state: () => ({ tempoBPM, CURRENT_BG, BG_NOISE, DRAWN_OBJECTS, timeline, animations, SPRITES, SEED })
+  _state: () => ({ tempoBPM, CURRENT_BG, BG_NOISE, DRAWN_OBJECTS, timeline, animations, SPRITES, SEED, FIELDS })
 };
 
 // ------------------------------
@@ -1247,7 +1351,11 @@ blob 400 300 56 20 22 color #00E1B4 id=b2 speed 0.28
 blob 600 300 44 16 16 color #FF3CAC id=b3 speed 0.28
 wiggle b1 6 4 0.35
 wiggle b2 8 6 0.25
-wiggle b3 5 7 0.30`,
+wiggle b3 5 7 0.30
+field noise id=f1 scale 0.006 speed 0.22 strength 35
+behavior b1 use f1 mix 0.8
+behavior b2 use f1 mix 0.8
+behavior b3 use f1 mix 0.8`,
       example2: `canvas 800 600
 background #111
 poly 200 300 60 6 color #FF00FF id=p1 rot 15
@@ -1255,7 +1363,11 @@ star 400 300 70 28 7 color #00FFFF id=s1 rot 0
 poly 600 300 50 5 color #FFFF00 id=p2 rot -10
 wiggle p1 6 6 0.4
 wiggle s1 4 8 0.3
-wiggle p2 6 6 0.5`,
+wiggle p2 6 6 0.5
+field noise id=f1 scale 0.005 speed 0.2 strength 30
+behavior p1 use f1 mix 0.8
+behavior s1 use f1 mix 0.8
+behavior p2 use f1 mix 0.8`,
       example3: `canvas 800 600
 backgroundnoise 1.2 0.12 color #0b1022 #1c2a4a
 tempo 60
