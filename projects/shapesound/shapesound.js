@@ -319,6 +319,29 @@ function drawSprite(ctx, s) {
     return;
   }
 
+  // NEW: live generative shapes as sprites, so they can wiggle & animate via animatesprite
+  if (s.type === 'genshape' && s.ref) {
+    const o = s.ref;
+    const kind = o.type;
+    if (kind === 'star') {
+      drawStar(ctx, tx, ty, o.rOuter, o.rInner, o.points, o.color, o.rot || 0);
+    } else if (kind === 'poly') {
+      drawPoly(ctx, tx, ty, o.radius, o.sides, o.color, o.rot || 0);
+    } else if (kind === 'blob') {
+      // override x/y for the animated position but preserve other params
+      drawBlob(ctx, { ...o, x: tx, y: ty }, (lastNow - startTime)/1000);
+    } else if (kind === 'circle') {
+      ctx.beginPath();
+      ctx.arc(tx, ty, o.r, 0, Math.PI*2);
+      ctx.fillStyle = o.color || "#FFF";
+      ctx.fill();
+    } else if (kind === 'rect') {
+      ctx.fillStyle = o.color || "#FFF";
+      ctx.fillRect(tx, ty, o.w, o.h);
+    }
+    return;
+  }
+
   if (s.type === 'image') {
     const img = ASSETS.images[s.key];
     if (!img) {
@@ -443,7 +466,7 @@ function parseAndSchedule(script, ctx, canvas) {
         break;
       }
 
-      // Basic shapes (retained; now allow id=)
+      // Basic shapes (retained; now allow id=) — also mirror as live genshape sprites if id is present
       case "circle": {
         const [x, y, r] = parts.slice(1, 4).map(Number);
         const color = parts.includes("color") ? parts[parts.indexOf("color") + 1] : "#FFF";
@@ -451,6 +474,7 @@ function parseAndSchedule(script, ctx, canvas) {
         const shape = { type: "circle", id, x, y, r, color };
         DRAWN_OBJECTS.push(shape);
         timeline.push({ type: "draw", shape: "circle", ...shape, time: currentTime });
+        if (id) SPRITES[id] = { id, type: 'genshape', ref: shape, x, y, scale: 1 };
         break;
       }
       case "rect": {
@@ -460,6 +484,7 @@ function parseAndSchedule(script, ctx, canvas) {
         const shape = { type: "rect", id, x, y, w, h, color };
         DRAWN_OBJECTS.push(shape);
         timeline.push({ type: "draw", shape: "rect", ...shape, time: currentTime });
+        if (id) SPRITES[id] = { id, type: 'genshape', ref: shape, x, y, scale: 1 };
         break;
       }
       case "line": {
@@ -470,10 +495,11 @@ function parseAndSchedule(script, ctx, canvas) {
         const shape = { type: "line", id, x1, y1, x2, y2, width, color };
         DRAWN_OBJECTS.push(shape);
         timeline.push({ type: "draw", shape: "line", ...shape, time: currentTime });
+        // lines are not mirrored as sprites by default (rarely animated); can be added if needed
         break;
       }
 
-      // New generative shapes
+      // New generative shapes (also mirrored as live sprites if id exists)
       case "blob": {
         // blob x y r points jitter color #hex [id=name] [speed s]
         const [x,y,r,points,jitter] = parts.slice(1,6).map(Number);
@@ -484,6 +510,7 @@ function parseAndSchedule(script, ctx, canvas) {
         const shape = { type:"blob", id, x, y, r, points, jitter, color, speed, phase };
         DRAWN_OBJECTS.push(shape);
         timeline.push({ type:"draw", shape:"blob", ...shape, time: currentTime });
+        if (id) SPRITES[id] = { id, type: 'genshape', ref: shape, x, y, scale: 1 };
         break;
       }
       case "star": {
@@ -495,6 +522,7 @@ function parseAndSchedule(script, ctx, canvas) {
         const shape = { type:"star", id, x, y, rOuter:rO, rInner:rI, points:pts, color, rot };
         DRAWN_OBJECTS.push(shape);
         timeline.push({ type:"draw", shape:"star", ...shape, time: currentTime });
+        if (id) SPRITES[id] = { id, type: 'genshape', ref: shape, x, y, scale: 1 };
         break;
       }
       case "poly": {
@@ -506,6 +534,7 @@ function parseAndSchedule(script, ctx, canvas) {
         const shape = { type:"poly", id, x, y, radius:rad, sides, color, rot };
         DRAWN_OBJECTS.push(shape);
         timeline.push({ type:"draw", shape:"poly", ...shape, time: currentTime });
+        if (id) SPRITES[id] = { id, type: 'genshape', ref: shape, x, y, scale: 1 };
         break;
       }
 
@@ -657,7 +686,7 @@ function parseAndSchedule(script, ctx, canvas) {
         break;
       }
 
-      // Wiggle (now supports shapes and sprites via id)
+      // Wiggle (supports shapes and sprites via id)
       case "wiggle": {
         // wiggle <id> ampX ampY freq  OR  wiggle <id> amp freq
         const id = parts[1];
@@ -738,7 +767,7 @@ function parseAndSchedule(script, ctx, canvas) {
           break;
         }
 
-        // circle/rect linears with optional colors
+        // circle/rect linears with optional colors (overlay style)
         const from = parts.slice(2, 5).map(Number);
         const to = parts.slice(6, 9).map(Number);
         const durKey = parts.indexOf("duration");
@@ -848,6 +877,9 @@ function loop(now, ctx, canvas) {
 
   // static/generative shapes (with optional wiggle)
   for (const obj of DRAWN_OBJECTS) {
+    // If this object is mirrored as a live sprite (genshape), skip static draw to avoid double-render
+    if (obj.id && SPRITES[obj.id] && SPRITES[obj.id].type === 'genshape') continue;
+
     let ox = 0, oy = 0;
     if (obj.wiggle && startTime != null) {
       const freq = obj.wiggle.freq || 1;
@@ -881,7 +913,7 @@ function loop(now, ctx, canvas) {
     }
   }
 
-  // live sprites (image/sheet/proc-turtle)
+  // live sprites (image/sheet/proc-turtle/genshape)
   for (const id in SPRITES) drawSprite(ctx, SPRITES[id]);
 
   // Active animations (shapes and sprites)
@@ -972,6 +1004,7 @@ function renderInitial() {
     ctx.fillRect(0, 0, canvas.width, canvas.height);
   }
   for (const obj of DRAWN_OBJECTS) {
+    if (obj.id && SPRITES[obj.id] && SPRITES[obj.id].type === 'genshape') continue;
     if (obj.type === "circle") {
       ctx.beginPath();
       ctx.arc(obj.x, obj.y, obj.r, 0, 2 * Math.PI);
@@ -1104,8 +1137,8 @@ function naturalToDSL(input){
     else dsl.push(`sequence { C4 D4 E4 }`);
   }
 
-  // drift across?
-  if ((leftToRight || rightToLeft) && !hasTurtle && count>0) {
+  // drift across? (works now because shapes are mirrored as live genshape sprites with same ids)
+  if ((leftToRight || rightToLeft || drift) && !hasTurtle && count>0) {
     const ids = dsl.filter(l=>/ id=/.test(l)).map(l=>l.match(/id=([a-z0-9]+)/i)[1]);
     const dur = slow?12:fast?6:9;
     const fromX = rightToLeft ? 780 : 20;
