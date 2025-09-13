@@ -1,5 +1,3 @@
-/* projects/shapesound/style.css */
-
 /* Base styles (apply to both themes) */
 body {
   font-family: monospace;
@@ -21,11 +19,7 @@ body.dark {
   background: #111;
   color: #f0f0f0;
 }
-
-body.dark canvas {
-  background: #000;
-}
-
+body.dark canvas { background: #000; }
 body.dark #prompt-box input,
 body.dark textarea,
 body.dark #help-panel {
@@ -39,11 +33,7 @@ body.light {
   background: #f4f4f4;
   color: #222;
 }
-
-body.light canvas {
-  background: #fff;
-}
-
+body.light canvas { background: #fff; }
 body.light #prompt-box input,
 body.light textarea,
 body.light #help-panel {
@@ -60,7 +50,25 @@ body.light #help-panel {
   width: 100%;
   margin-bottom: 1rem;
 }
+#top-bar h1 {
+  margin: 0;
+  padding: 0;
+  font-size: 1.3rem;
+}
+.left-actions, .right-actions { display: flex; gap: .5rem; align-items: center; }
 
+/* Ghost/back button */
+.ghost-btn {
+  background: transparent;
+  border: 1px dashed currentColor;
+  padding: .4rem .7rem;
+  cursor: pointer;
+  font-family: monospace;
+  opacity: .8;
+}
+.ghost-btn:hover { opacity: 1; }
+
+/* Theme toggle */
 #theme-toggle {
   padding: 0.5rem 1rem;
   background: #444;
@@ -70,15 +78,8 @@ body.light #help-panel {
   font-family: monospace;
   transition: background 0.2s ease;
 }
-
-body.light #theme-toggle {
-  background: #ddd;
-  color: #111;
-}
-
-#theme-toggle:hover {
-  background: #666;
-}
+body.light #theme-toggle { background: #ddd; color: #111; }
+#theme-toggle:hover { background: #666; }
 
 /* Prompt Box */
 #prompt-box {
@@ -87,13 +88,11 @@ body.light #theme-toggle {
   margin-bottom: 1rem;
   flex-wrap: wrap;
 }
-
 #prompt-box input {
   flex: 1;
   padding: 0.5rem;
   font-family: monospace;
 }
-
 #prompt-box button {
   padding: 0.5rem 1rem;
   background: #444;
@@ -102,6 +101,18 @@ body.light #theme-toggle {
   cursor: pointer;
   transition: background 0.2s ease;
 }
+
+/* Inline toggle (checkbox + label) */
+.inline-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: .4rem;
+  padding: .45rem .65rem;
+  border: 1px solid #444;
+  border-radius: 4px;
+  user-select: none;
+}
+.inline-toggle input { accent-color: #00ffaa; }
 
 /* Code Editor */
 textarea {
@@ -130,7 +141,6 @@ canvas {
   gap: 0.5rem;
   justify-content: center;
 }
-
 #controls button,
 #timeline-controls button,
 .button-like {
@@ -142,14 +152,12 @@ canvas {
   font-family: monospace;
   transition: background 0.2s ease, transform 0.1s ease;
 }
-
 body.light #controls button,
 body.light #timeline-controls button,
 body.light .button-like {
   background: #ddd;
   color: #111;
 }
-
 #controls button:active,
 #timeline-controls button:active,
 .button-like:active {
@@ -157,13 +165,8 @@ body.light .button-like {
 }
 
 /* File input styled as button */
-#load-json {
-  display: none;
-}
-.button-like {
-  display: inline-block;
-  text-align: center;
-}
+#load-json { display: none; }
+.button-like { display: inline-block; text-align: center; }
 
 /* Timeline Controls */
 #timeline-controls {
@@ -174,7 +177,6 @@ body.light .button-like {
   align-items: center;
   justify-content: center;
 }
-
 #timeline-scrubber {
   width: 200px;
   accent-color: #00ffaa;
@@ -191,7 +193,16 @@ body.light .button-like {
   border-radius: 4px;
 }
 
-/* Error Box */
+/* Perf + Error Boxes */
+#perf-warning {
+  margin-top: .25rem;
+  background: #ffcf33;
+  color: #111;
+  padding: 0.5rem 0.75rem;
+  font-weight: 600;
+  border-radius: 6px;
+  display: none; /* shown by JS when FPS drops */
+}
 #error-box {
   margin-top: 0.5rem;
   background: #330000;
@@ -209,20 +220,14 @@ body.light .button-like {
     flex-direction: column;
     align-items: stretch;
   }
-
   #controls button, 
   #prompt-box button, 
   #timeline-controls button,
   .button-like,
-  #theme-toggle {
+  #theme-toggle,
+  .ghost-btn {
     width: 100%;
   }
-
-  #timeline-scrubber {
-    width: 100%;
-  }
-
-  textarea {
-    height: 150px;
-  }
+  #timeline-scrubber { width: 100%; }
+  textarea { height: 150px; }
 }
