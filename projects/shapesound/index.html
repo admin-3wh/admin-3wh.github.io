@@ -380,8 +380,8 @@ behavior b3 use f1 mix 0.8</textarea>
   <script>
     // Secondary Run button (the top one is already wired by shapesound.js)
     document.getElementById('run2')?.addEventListener('click', () => {
-      const code = document.getElementById('code').value || '';
-      window.ShapeSound.loadFromText(code);
+      const code = document.getElementById('code')?.value || '';
+      window.ShapeSound?.loadFromText(code);
     });
 
     // Extend the example picker for two extra demos (example4, example5).
@@ -425,7 +425,8 @@ sequence { C4 D4 E4 G4 }`
       };
 
       if (extras[val]) {
-        document.getElementById('code').value = extras[val];
+        const area = document.getElementById('code');
+        if (area) area.value = extras[val];
       }
       // If user selects example1..3, shapesound.js' built-in handler will populate the code.
     });
@@ -452,7 +453,13 @@ sequence { C4 D4 E4 G4 }`
     }
 
     document.getElementById('init-audio')?.addEventListener('click', () => {
-      try { window.ShapeSound?.hooks?.getAC(); } catch (e) {}
+      try {
+        // Prefer the explicit API added in shapesound.js
+        window.ShapeSound?.initAudio();
+      } catch (e) {
+        // Fallback: force-create AC via hooks if needed
+        try { window.ShapeSound?.hooks?.getAC?.(); } catch(_) {}
+      }
       startMeter();
     });
 
@@ -467,33 +474,31 @@ sequence { C4 D4 E4 G4 }`
     document.getElementById('physics-off')?.addEventListener('click', () => hooks()?.setPhysics(false));
 
     document.getElementById('apply-gravity')?.addEventListener('click', () => {
-      const gx = parseFloat(document.getElementById('grav-x').value);
-      const gy = parseFloat(document.getElementById('grav-y').value);
-      const d  = parseFloat(document.getElementById('damping').value);
-      const b  = document.getElementById('bounds').value;
+      const gx = parseFloat(document.getElementById('grav-x')?.value);
+      const gy = parseFloat(document.getElementById('grav-y')?.value);
+      const d  = parseFloat(document.getElementById('damping')?.value);
+      const b  = document.getElementById('bounds')?.value;
       hooks()?.setGravity(isFinite(gx)?gx:0, isFinite(gy)?gy:0);
       hooks()?.setDamping(isFinite(d)?d:1);
       hooks()?.setBounds(b === 'canvas' ? 'canvas' : 'none');
     });
 
     document.getElementById('apply-impulse')?.addEventListener('click', () => {
-      const id = (document.getElementById('sprite-id').value || '').trim();
-      const ix = parseFloat(document.getElementById('imp-x').value);
-      const iy = parseFloat(document.getElementById('imp-y').value);
+      const id = (document.getElementById('sprite-id')?.value || '').trim();
+      const ix = parseFloat(document.getElementById('imp-x')?.value);
+      const iy = parseFloat(document.getElementById('imp-y')?.value);
       if (id) hooks()?.impulse(id, isFinite(ix)?ix:0, isFinite(iy)?iy:0);
     });
 
     document.getElementById('apply-vel')?.addEventListener('click', () => {
-      const id = (document.getElementById('sprite-id').value || '').trim();
-      const vx = parseFloat(document.getElementById('vel-x').value);
-      const vy = parseFloat(document.getElementById('vel-y').value);
+      const id = (document.getElementById('sprite-id')?.value || '').trim();
+      const vx = parseFloat(document.getElementById('vel-x')?.value);
+      const vy = parseFloat(document.getElementById('vel-y')?.value);
       if (id) hooks()?.setVel(id, isFinite(vx)?vx:0, isFinite(vy)?vy:0);
     });
 
     // Kick the meter once the page is interacted with (optional)
-    window.addEventListener('click', () => {
-      startMeter();
-    }, { once: true, passive: true });
+    window.addEventListener('click', () => { startMeter(); }, { once: true, passive: true });
   </script>
 </body>
 </html>
