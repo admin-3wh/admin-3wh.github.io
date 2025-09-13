@@ -1,246 +1,306 @@
-<!-- projects/shapesound/index.html -->
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="utf-8" />
   <title>ShapeSound</title>
-  <link rel="stylesheet" href="style.css" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    :root {
+      --bg: #0b0f1a;
+      --panel: #121826;
+      --panel-2: #0f1422;
+      --text: #e7ebf3;
+      --muted: #98a2b3;
+      --accent: #7c5cff;
+      --btn: #1f2a44;
+      --btn-hover: #2a3656;
+      --error: #ff4d6d;
+      --ok: #2dd4bf;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      background: linear-gradient(120deg, #0b0f1a, #0b1222 60%, #0a1530);
+      color: var(--text);
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Inter, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+    }
+
+    header {
+      padding: 16px 20px;
+      border-bottom: 1px solid #1a2237;
+      background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0));
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    header h1 {
+      font-size: 18px;
+      margin: 0;
+      letter-spacing: 0.4px;
+      font-weight: 600;
+    }
+    header .sub {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .wrap {
+      display: grid;
+      grid-template-columns: 1fr 380px;
+      gap: 16px;
+      padding: 16px;
+    }
+    @media (max-width: 960px) {
+      .wrap { grid-template-columns: 1fr; }
+    }
+
+    /* Canvas area */
+    .stage {
+      background: var(--panel);
+      border: 1px solid #1b2440;
+      border-radius: 12px;
+      padding: 12px;
+      display: grid;
+      gap: 12px;
+    }
+    .canvas-frame {
+      display: grid;
+      place-items: center;
+      background: var(--panel-2);
+      border: 1px solid #1b2440;
+      border-radius: 10px;
+      padding: 8px;
+      min-height: 300px;
+    }
+    canvas {
+      width: 800px;
+      height: 600px;
+      max-width: 100%;
+      background: #000;
+      border-radius: 8px;
+      image-rendering: crisp-edges;
+    }
+
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .left-controls, .right-controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+    button, select, input[type="range"] {
+      background: var(--btn);
+      color: var(--text);
+      border: 1px solid #243055;
+      border-radius: 8px;
+      padding: 8px 10px;
+      font-size: 13px;
+    }
+    button:hover { background: var(--btn-hover); cursor: pointer; }
+    button.primary {
+      background: var(--accent);
+      border-color: #6c4bff;
+      color: white;
+    }
+    button.primary:hover { filter: brightness(1.05); }
+
+    .scrubber {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+      align-items: center;
+      padding: 8px 10px;
+      background: #0e1830;
+      border: 1px solid #1b2440;
+      border-radius: 10px;
+    }
+    #timeline-scrubber { width: 100%; accent-color: var(--accent); }
+
+    .error {
+      display: none;
+      background: #2a1020;
+      border: 1px solid #522;
+      color: #ffd9e1;
+      padding: 10px 12px;
+      border-radius: 8px;
+      font-size: 13px;
+    }
+
+    /* Control panel */
+    .panel {
+      background: var(--panel);
+      border: 1px solid #1b2440;
+      border-radius: 12px;
+      padding: 12px;
+      display: grid;
+      gap: 12px;
+      position: relative;
+    }
+    .panel h2 {
+      font-size: 14px;
+      margin: 0 0 4px;
+      color: var(--muted);
+      letter-spacing: 0.3px;
+      font-weight: 600;
+    }
+    textarea {
+      width: 100%;
+      min-height: 180px;
+      resize: vertical;
+      background: #0f172a;
+      color: #e6ecff;
+      border: 1px solid #1e294a;
+      border-radius: 8px;
+      padding: 10px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+      font-size: 12px;
+      line-height: 1.45;
+    }
+    .grid {
+      display: grid;
+      gap: 10px;
+    }
+    .row {
+      display: grid;
+      gap: 8px;
+    }
+    .row.inline { grid-template-columns: 1fr auto auto; align-items: center; }
+
+    .help {
+      background: #0e1630;
+      border: 1px dashed #28345e;
+      border-radius: 10px;
+      padding: 10px;
+      color: #c9d2ee;
+      font-size: 12px;
+    }
+    .muted { color: var(--muted); }
+    .footer-note { color: var(--muted); font-size: 12px; text-align: center; padding: 6px 0 2px; }
+    a { color: var(--ok); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+  </style>
 </head>
-<body class="dark">
-  <div id="app">
-    <header id="top-bar">
-      <div class="left-actions">
-        <button id="back-to-projects" class="ghost-btn" title="Back to Projects">⟵ Back to Projects</button>
+<body>
+  <header>
+    <h1>ShapeSound</h1>
+    <div class="sub">Draw • Animate • Play Notes</div>
+  </header>
+
+  <main class="wrap">
+    <!-- Left: Canvas/Playback -->
+    <section class="stage">
+      <div class="canvas-frame">
+        <canvas id="canvas" width="800" height="600"></canvas>
       </div>
-      <h1>ShapeSound</h1>
-      <div class="right-actions">
-        <button id="theme-toggle">🌙 Dark</button>
+
+      <div class="toolbar">
+        <div class="left-controls">
+          <button id="run" class="primary">Run Scene</button>
+          <button id="play-scene">Play</button>
+          <button id="pause-scene">Pause</button>
+          <button id="resume-scene">Resume</button>
+        </div>
+        <div class="right-controls">
+          <button id="export-png" title="Download a PNG of the current canvas">Export PNG</button>
+        </div>
       </div>
-    </header>
 
-    <!-- Natural Prompt Box -->
-    <div id="prompt-box">
-      <input
-        type="text"
-        id="natural-prompt"
-        placeholder="Describe your scene (e.g., 'turtle crawling with slow notes' or '4 neon blobs drifting left to right')"
-      />
-      <button id="convert-prompt">Generate</button>
-      <label class="inline-toggle">
-        <input id="enable-analyser" type="checkbox" />
-        <span>Audio-react</span>
-      </label>
-    </div>
+      <div class="scrubber">
+        <input id="timeline-scrubber" type="range" min="0" max="100" value="0" />
+        <div class="muted" style="font-size:12px;">timeline</div>
+      </div>
 
-    <!-- Script Editor -->
-    <textarea id="code" placeholder="Write your ShapeSound script here..."></textarea>
+      <div id="error-box" class="error">Parse error will appear here.</div>
+    </section>
 
-    <!-- Controls -->
-    <div id="controls">
-      <button id="run">Run</button>
-      <button id="help-toggle">❓ Help</button>
-
-      <button id="save-json">Export JSON</button>
-      <input type="file" id="load-json" accept=".json" style="display:none;" />
-      <label for="load-json" class="button-like">Import JSON</label>
-
-      <select id="example-picker">
-        <option value="">Load Example</option>
-        <option value="example1">Neon Blobs + Flow Field</option>
-        <option value="example2">Polys + Vortex</option>
-        <option value="example3">Turtle + Radial Field</option>
-      </select>
-
-      <select id="saved-scenes"></select>
-      <button id="save-scene">Save</button>
-      <button id="delete-scene">Delete</button>
-
-      <button id="export-png">Export PNG</button>
-      <button id="copy-code">Copy Code</button>
-    </div>
-
-    <!-- Timeline Controls -->
-    <div id="timeline-controls">
-      <button id="play-scene">▶ Play</button>
-      <button id="pause-scene">⏸ Pause</button>
-      <button id="resume-scene">⏯ Resume</button>
-      <input type="range" id="timeline-scrubber" min="0" max="100" value="0" />
-    </div>
-
-    <!-- Perf + Errors -->
-    <div id="perf-warning" style="display:none;">Performance warning: heavy scene</div>
-    <div id="error-box" style="display:none;"></div>
-
-    <!-- Canvas -->
-    <canvas id="canvas" width="800" height="600"></canvas>
-
-    <!-- Help Panel -->
-    <div id="help-panel" style="display: none;">
-      <h3>ShapeSound Help</h3>
-      <pre>
+    <!-- Right: Controls/Editor -->
+    <aside class="panel">
+      <div class="grid">
+        <div class="row">
+          <h2>Natural Prompt → DSL</h2>
+          <div class="row inline">
+            <input id="natural-prompt" type="text" placeholder="e.g. neon blobs drifting left to right, slow, seed 42" style="background:#0f172a;border:1px solid #1e294a;border-radius:8px;padding:8px;color:#e6ecff;">
+            <button id="convert-prompt">Convert</button>
+            <button id="help-toggle" title="Toggle help">Help</button>
+          </div>
+          <div id="help-panel" class="help" style="display:none">
+            <div><strong>Quick DSL</strong></div>
+            <pre style="white-space:pre-wrap;margin:6px 0 0;">
 canvas 800 600
 background #000000
-tempo 100  <!-- beats per minute; affects 'play' and 'sequence' -->
+backgroundnoise 1.2 0.18 color #0b1022 #1c2a4a
+tempo 100
+blob 200 300 50 18 18 color #13F1FF id=b1 speed 0.3
+star 400 300 70 28 7 color #FFD84A id=s1 rot 15
+poly 600 300 60 6 color #FF00FF id=p1 rot 10
+wiggle b1 6 6 0.3
+field noise id=f1 scale 0.006 speed 0.22 strength 35
+behavior b1 use f1 mix 0.8
+animate sprite b1 20 120 1 -> 780 120 1 duration 8s ease in-out
+            </pre>
+          </div>
+        </div>
 
-circle 400 300 50 color #FF0000
-rect 100 100 100 100 color #00FF00
-line 100 100 300 300 width 5 color #FFFFFF
+        <div class="row">
+          <h2>Examples</h2>
+          <select id="example-picker">
+            <option value="">Select an example…</option>
+            <option value="example1">Flowy neon blobs</option>
+            <option value="example2">Polys + star with field</option>
+            <option value="example3">Turtle walk + sequence</option>
+          </select>
+        </div>
 
-sound 440 1
-play C4
-sequence {
-  C4 D4 E4 F4
-}
+        <div class="row">
+          <h2>Scene Code</h2>
+          <textarea id="code" spellcheck="false">canvas 800 600
+backgroundnoise 1.2 0.18 color #0b1022 #1c2a4a
+tempo 100
+blob 200 300 50 18 18 color #13F1FF id=b1 speed 0.28
+blob 400 300 56 20 22 color #00E1B4 id=b2 speed 0.28
+blob 600 300 44 16 16 color #FF3CAC id=b3 speed 0.28
+wiggle b1 6 4 0.35
+wiggle b2 8 6 0.25
+wiggle b3 5 7 0.30
+field noise id=f1 scale 0.006 speed 0.22 strength 35
+behavior b1 use f1 mix 0.8
+behavior b2 use f1 mix 0.8
+behavior b3 use f1 mix 0.8</textarea>
+          <div class="row" style="grid-template-columns: repeat(2,1fr); gap:8px;">
+            <button id="copy-code">Copy Code</button>
+            <button id="run" class="primary">Run Scene</button>
+          </div>
+        </div>
 
-sprite turtle crawling x=100 y=520 scale=1
+        <div class="row">
+          <h2>Saved Scenes</h2>
+          <div class="row" style="grid-template-columns: 1fr auto auto; gap:8px;">
+            <select id="saved-scenes">
+              <option value="">Select Saved Scene</option>
+            </select>
+            <button id="save-scene">Save</button>
+            <button id="delete-scene">Delete</button>
+          </div>
+        </div>
 
-animate sprite turtle 100 520 1 -> 700 520 1 duration 8s ease in-out
-animate circle 300 300 30 -> 500 300 80 duration 5s fromColor #FF0000 toColor #00FF00
+        <div class="footer-note">
+          Pro-tip: Click <em>Convert</em> to turn a natural prompt into DSL. Then hit <em>Run Scene</em>.
+        </div>
+      </div>
+    </aside>
+  </main>
 
--- New: Generative fields + behaviors + param automation --
-field id=f1 type=flow strength 18 scale 0.01 seed 7
-behavior id=c1 field=f1 follow 0.9 jitter 0.1 maxSpeed 240
-animate param field f1 strength 10 -> 35 duration 6s ease in-out
+  <!-- Optional TinyGPT (exposes window.TinyGPT). Keep before shapesound.js if you use it. -->
+  <!-- <script src="tinygpt.js"></script> -->
 
--- New: Z-layering (draw order) --
-layer 0
-circle 300 300 60 color #fff id=c1 z=1
-rect 280 280 120 120 color #000000 id=r1 z=0
-
--- Audio-react (stub analyser; toggle “Audio-react” in the UI) --
-audioreact id=c1 param=wiggle.amp band=mid amount=0.6
-
-delay 1000
-      </pre>
-    </div>
-  </div>
-
-  <!-- Bridge: import engine, normalize API, expose readiness -->
-  <script type="module">
-    function normalizeAPI(mod) {
-      let api = mod?.default ?? mod ?? {};
-      try {
-        if (typeof api === 'function' && !('loadFromText' in api) && !('run' in api)) {
-          api = new api();
-        }
-      } catch {}
-      if (window.ShapeSound && typeof window.ShapeSound === 'object') {
-        api = { ...api, ...window.ShapeSound };
-      }
-      return {
-        loadFromText: api.loadFromText || api.load || api.parseAndRun || api.run || null,
-        play:         api.play || api.start || null,
-        pause:        api.pause || null,
-        resume:       api.resume || api.unpause || null,
-        seek:         api.seek || null,
-        render:       api.render || api.renderInitial || null,
-        _raw:         api,
-      };
-    }
-
-    async function initBridge() {
-      const cacheBust = `?v=${Date.now()}`;
-      try {
-        const mod = await import('./shapesound.js' + cacheBust);
-        const api = normalizeAPI(mod);
-        window.ShapeSound = api;
-        console.log('[ShapeSound] Bridge ready; exports:', Object.keys(api._raw || {}));
-      } catch (err) {
-        console.error('[ShapeSound] Failed to import ./shapesound.js', err);
-        const box = document.getElementById('error-box');
-        if (box) {
-          box.style.display = 'block';
-          box.style.color = 'orangered';
-          box.textContent = 'Engine bridge failed to initialize: ' + (err?.message || err);
-        }
-        throw err;
-      }
-    }
-    window.ShapeSoundReady = initBridge();
-  </script>
-
-  <!-- TF.js (must be before TinyGPT) -->
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.18.0/dist/tf.min.js"></script>
-
-  <!-- TinyGPT loader (cache-busted) -->
-  <script src="tinygpt.js?v=10"></script>
-
-  <!-- UI wiring -->
-  <script>
-    const $ = (s) => document.querySelector(s);
-    const codeArea = $('#code');
-    const statusEl = $('#error-box');
-
-    // Back to Projects
-    $('#back-to-projects')?.addEventListener('click', () => {
-      // from /projects/shapesound/ -> up to /projects/
-      window.location.href = '..';
-    });
-
-    function setStatus(msg, ok=false) {
-      statusEl.style.display = 'block';
-      statusEl.style.color = ok ? 'limegreen' : 'orange';
-      statusEl.textContent = msg;
-      if (ok) setTimeout(() => (statusEl.style.display = 'none'), 1200);
-    }
-
-    // Generate via TinyGPT
-    $('#convert-prompt')?.addEventListener('click', async () => {
-      const input = $('#natural-prompt').value;
-      setStatus('Thinking with TinyGPT…');
-      try {
-        const dsl = await window.TinyGPT.promptToSceneDSL(input);
-        codeArea.value = dsl;
-        setStatus('Generated!', true);
-      } catch (e) {
-        console.error(e);
-        setStatus('AI generation failed. Check console.');
-      }
-    });
-
-    // Load + render current DSL
-    async function loadAndRender() {
-      try { await window.ShapeSoundReady; } catch { setStatus('Engine bridge failed to initialize.'); return; }
-      const eng = window.ShapeSound;
-      if (!eng) { setStatus('Engine bridge not ready.'); return; }
-
-      const code = codeArea.value || '';
-      try {
-        if (typeof eng.loadFromText === 'function')           await eng.loadFromText(code);
-        else if (typeof eng._raw?.run === 'function')         await eng._raw.run(code);
-        else if (typeof eng._raw?.parseAndRun === 'function') await eng._raw.parseAndRun(code);
-        else throw new Error('No load/run method found on ShapeSound');
-
-        if (typeof eng.render === 'function') eng.render();
-        else if (typeof eng._raw?.renderInitial === 'function') eng._raw.renderInitial();
-
-        setStatus('Ready.', true);
-      } catch (e) {
-        console.error('[ShapeSound] load/run error', e);
-        setStatus('Could not load scene. See console.');
-      }
-    }
-
-    $('#run')?.addEventListener('click', loadAndRender);
-    $('#play-scene')?.addEventListener('click', async () => { try { await window.ShapeSoundReady; window.ShapeSound?.play?.(); } catch(e){ console.error(e); } });
-    $('#pause-scene')?.addEventListener('click', async () => { try { await window.ShapeSoundReady; window.ShapeSound?.pause?.(); } catch(e){ console.error(e); } });
-    $('#resume-scene')?.addEventListener('click', async () => { try { await window.ShapeSoundReady; window.ShapeSound?.resume?.(); } catch(e){ console.error(e); } });
-
-    // Theme Toggle
-    const themeToggle = document.getElementById("theme-toggle");
-    const body = document.body;
-    if (localStorage.getItem("theme")) {
-      body.className = localStorage.getItem("theme");
-      themeToggle.textContent = body.classList.contains("dark") ? "🌙 Dark" : "☀️ Light";
-    }
-    themeToggle.addEventListener("click", () => {
-      body.classList.toggle("dark");
-      body.classList.toggle("light");
-      const theme = body.classList.contains("dark") ? "dark" : "light";
-      themeToggle.textContent = theme === "dark" ? "🌙 Dark" : "☀️ Light";
-      localStorage.setItem("theme", theme);
-    });
-  </script>
+  <!-- Your engine -->
+  <script type="module" src="shapesound.js"></script>
 </body>
 </html>
