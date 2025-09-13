@@ -134,6 +134,17 @@
       font-size: 13px;
     }
 
+    /* Loading indicator the engine toggles */
+    .loading {
+      display: none;
+      background: #0e1630;
+      border: 1px dashed #28345e;
+      color: #c9d2ee;
+      padding: 8px 10px;
+      border-radius: 8px;
+      font-size: 12px;
+    }
+
     /* Control panel */
     .panel {
       background: var(--panel);
@@ -230,6 +241,9 @@
         <div class="muted" style="font-size:12px;">timeline</div>
       </div>
 
+      <!-- shapesound.js will toggle this while assets load -->
+      <div id="loading-indicator" class="loading">Loading assets…</div>
+
       <div id="error-box" class="error">Parse error will appear here.</div>
     </section>
 
@@ -257,6 +271,10 @@ wiggle b1 6 6 0.3
 field noise id=f1 scale 0.006 speed 0.22 strength 35
 behavior b1 use f1 mix 0.8
 animate sprite b1 20 120 1 -> 780 120 1 duration 8s ease in-out
+
+Tips:
+• Use z= on shapes/sprites for layering, e.g. poly ... id=p1 z=2
+• Inline // comments are allowed
             </pre>
           </div>
         </div>
@@ -295,7 +313,19 @@ behavior b3 use f1 mix 0.8</textarea>
           </div>
         </div>
 
-        <!-- NEW: Audio controls -->
+        <!-- Optional: Saved scenes (the engine wires this up if present) -->
+        <div class="row">
+          <h2>Saved Scenes</h2>
+          <div class="mini-grid-3">
+            <select id="saved-scenes">
+              <option value="">Select Saved Scene</option>
+            </select>
+            <button id="save-scene" title="Save current code locally">Save</button>
+            <button id="delete-scene" title="Delete selected saved scene">Delete</button>
+          </div>
+        </div>
+
+        <!-- Audio controls -->
         <div class="row">
           <h2>Audio</h2>
           <div class="mini-grid">
@@ -309,7 +339,7 @@ behavior b3 use f1 mix 0.8</textarea>
           <div class="meter"><div id="meter-bar" class="bar"></div></div>
         </div>
 
-        <!-- NEW: Physics controls -->
+        <!-- Physics controls -->
         <div class="row">
           <h2>Physics</h2>
           <div class="mini-grid-3">
@@ -379,9 +409,9 @@ behavior b3 use f1 mix 0.8</textarea>
   <!-- Wire extra UI to ShapeSound.hooks and extend examples -->
   <script>
     // Secondary Run button (the top one is already wired by shapesound.js)
-    document.getElementById('run2')?.addEventListener('click', () => {
+    document.getElementById('run2')?.addEventListener('click', async () => {
       const code = document.getElementById('code')?.value || '';
-      window.ShapeSound?.loadFromText(code);
+      await window.ShapeSound?.loadFromText(code);
     });
 
     // Extend the example picker for two extra demos (example4, example5).
@@ -453,13 +483,7 @@ sequence { C4 D4 E4 G4 }`
     }
 
     document.getElementById('init-audio')?.addEventListener('click', () => {
-      try {
-        // Prefer the explicit API added in shapesound.js
-        window.ShapeSound?.initAudio();
-      } catch (e) {
-        // Fallback: force-create AC via hooks if needed
-        try { window.ShapeSound?.hooks?.getAC?.(); } catch(_) {}
-      }
+      try { window.ShapeSound?.initAudio(); } catch (e) { try { window.ShapeSound?.hooks?.getAC?.(); } catch(_) {} }
       startMeter();
     });
 
