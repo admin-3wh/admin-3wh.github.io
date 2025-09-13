@@ -1088,9 +1088,10 @@ function loop(now, ctx, canvas) {
         const x = x1 + (x2 - x1) * t;
         const y = y1 + (y2 - y1) * t;
         const r = r1 + (r2 - r1) * t;
+        const c = color || "#FF00FF";
         ctx.beginPath();
         ctx.arc(x, y, r, 0, 2 * Math.PI);
-        ctx.fillStyle = color || "#FF00FF";
+        ctx.fillStyle = c;
         ctx.fill();
       } else if (anim.shape === "rect") {
         const [x1, y1, w1] = anim.from;
@@ -1135,7 +1136,10 @@ function loop(now, ctx, canvas) {
 // ------------------------------
 function runFromText(code) {
   const canvas = document.getElementById("canvas");
+  if (!canvas) return;
   const ctx = canvas.getContext("2d");
+  if (!ctx) return;
+
   try {
     parseAndSchedule(code, ctx, canvas);
   } catch (err) {
@@ -1151,7 +1155,10 @@ function runFromText(code) {
 
 function renderInitial() {
   const canvas = document.getElementById("canvas");
+  if (!canvas) return;
   const ctx = canvas.getContext("2d");
+  if (!ctx) return;
+
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   if (BG_NOISE) {
     // draw once
@@ -1348,13 +1355,21 @@ window.ShapeSound = {
   // Playback controls
   play() {
     paused = false;
+    // keep elapsed time when resuming
     startTime = performance.now() - (pauseOffset || 0);
     lastNow = startTime;
     const canvas = document.getElementById("canvas");
-    const ctx = canvas.getContext("2d");
+    const ctx = canvas?.getContext?.("2d");
+    if (!ctx) return;
     requestAnimationFrame(now => { if (!paused) loop(now, ctx, canvas); });
   },
-  pause() { paused = true; },
+  pause() {
+    if (!paused && startTime != null) {
+      // capture elapsed so resume picks up from the same position
+      pauseOffset = performance.now() - startTime;
+    }
+    paused = true;
+  },
   resume() { this.play(); },
   seek(percent01) {
     if (!currentScene.duration) return;
@@ -1374,6 +1389,7 @@ window.ShapeSound = {
     getAC: () => getAC(),
     setMasterVolume: (v) => setMasterVolume(v),
     getLevels: () => getLevels(),
+    initAudio: () => { try { unlockAudioOnce(); } catch(_) {} },
 
     // tempo/seed
     setTempo: (bpm) => { bpm = Number(bpm); if (isFinite(bpm) && bpm > 0) tempoBPM = bpm; },
@@ -1388,7 +1404,10 @@ window.ShapeSound = {
     // sprite nudges
     impulse: (id, ix=0, iy=0) => { const s = SPRITES[id]; if (s){ s.physics = true; s.vx = (s.vx||0)+Number(ix)||0; s.vy = (s.vy||0)+Number(iy)||0; } },
     setVel: (id, vx=0, vy=0) => { const s = SPRITES[id]; if (s){ s.physics = true; s.vx = Number(vx)||0; s.vy = Number(vy)||0; } },
-  }
+  },
+
+  // quick helper to init audio from UI (same as hooks.initAudio)
+  initAudio() { try { unlockAudioOnce(); } catch(_) {} }
 };
 
 // ------------------------------
@@ -1396,13 +1415,15 @@ window.ShapeSound = {
 // ------------------------------
 document.addEventListener("DOMContentLoaded", () => {
   const canvas = document.getElementById("canvas");
-  const ctx = canvas.getContext("2d");
+  const ctx = canvas?.getContext?.("2d");
   const codeArea = document.getElementById("code");
+
+  if (!ctx) return;
 
   // "Run" button uses the same public API
   document.getElementById("run")?.addEventListener("click", () => {
     unlockAudioOnce();
-    window.ShapeSound.loadFromText(codeArea.value || "");
+    window.ShapeSound.loadFromText(codeArea?.value || "");
   });
 
   // Timeline controls
@@ -1424,9 +1445,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // --- Replace the basic converter with the richer NL parser ---
   document.getElementById("convert-prompt")?.addEventListener("click", () => {
-    const input = document.getElementById("natural-prompt").value;
-    const dsl = naturalToDSL(input || "");
-    codeArea.value = dsl;
+    const input = document.getElementById("natural-prompt")?.value || "";
+    const dsl = naturalToDSL(input);
+    if (codeArea) codeArea.value = dsl;
   });
 
   // Example Picker (updated to show generative bits)
@@ -1465,16 +1486,17 @@ sprite turtle crawling x=100 y=520 scale=1 id=t1
 animate sprite t1 100 520 1 -> 700 520 1 duration 8s ease in-out
 sequence { C3 E3 G3 }`
     };
-    document.getElementById("code").value = examples[val] || "";
+    if (codeArea) codeArea.value = examples[val] || "";
   });
 
-  // Help Toggle (unchanged)
+  // Help Toggle
   document.getElementById("help-toggle")?.addEventListener("click", () => {
     const panel = document.getElementById("help-panel");
+    if (!panel) return;
     panel.style.display = panel.style.display === "none" ? "block" : "none";
   });
 
-  // Saved Scenes (unchanged)
+  // Saved Scenes
   function updateSavedScenes() {
     const dropdown = document.getElementById("saved-scenes");
     if (!dropdown) return;
@@ -1492,7 +1514,7 @@ sequence { C3 E3 G3 }`
   document.getElementById("save-scene")?.addEventListener("click", () => {
     const name = prompt("Enter name for this scene:");
     if (name) {
-      localStorage.setItem("ss-" + name, document.getElementById("code").value);
+      localStorage.setItem("ss-" + name, document.getElementById("code")?.value || "");
       updateSavedScenes();
     }
   });
@@ -1507,12 +1529,14 @@ sequence { C3 E3 G3 }`
   document.getElementById("saved-scenes")?.addEventListener("change", (e) => {
     const name = e.target.value;
     if (name) {
-      document.getElementById("code").value = localStorage.getItem("ss-" + name);
+      const val = localStorage.getItem("ss-" + name);
+      const area = document.getElementById("code");
+      if (area) area.value = val || "";
     }
   });
   updateSavedScenes();
 
-  // Export PNG / Copy (unchanged)
+  // Export PNG / Copy
   document.getElementById("export-png")?.addEventListener("click", () => {
     const link = document.createElement("a");
     link.download = "shapesound.png";
@@ -1520,7 +1544,8 @@ sequence { C3 E3 G3 }`
     link.click();
   });
   document.getElementById("copy-code")?.addEventListener("click", () => {
-    navigator.clipboard.writeText(document.getElementById("code").value).then(() => {
+    const area = document.getElementById("code");
+    navigator.clipboard.writeText(area?.value || "").then(() => {
       alert("Code copied to clipboard!");
     });
   });
