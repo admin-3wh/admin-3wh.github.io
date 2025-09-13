@@ -164,14 +164,8 @@
       font-size: 12px;
       line-height: 1.45;
     }
-    .grid {
-      display: grid;
-      gap: 10px;
-    }
-    .row {
-      display: grid;
-      gap: 8px;
-    }
+    .grid { display: grid; gap: 10px; }
+    .row { display: grid; gap: 8px; }
     .row.inline { grid-template-columns: 1fr auto auto; align-items: center; }
 
     .help {
@@ -274,6 +268,9 @@ animate sprite b1 20 120 1 -> 780 120 1 duration 8s ease in-out
             <option value="example1">Flowy neon blobs</option>
             <option value="example2">Polys + star with field</option>
             <option value="example3">Turtle walk + sequence</option>
+            <!-- NEW demo entries handled in-page -->
+            <option value="example4">Physics: gravity + bounces</option>
+            <option value="example5">Field flow + drifting polys</option>
           </select>
         </div>
 
@@ -379,12 +376,58 @@ behavior b3 use f1 mix 0.8</textarea>
   <!-- Your engine -->
   <script type="module" src="shapesound.js"></script>
 
-  <!-- Wire extra UI to ShapeSound.hooks -->
+  <!-- Wire extra UI to ShapeSound.hooks and extend examples -->
   <script>
     // Secondary Run button (the top one is already wired by shapesound.js)
     document.getElementById('run2')?.addEventListener('click', () => {
       const code = document.getElementById('code').value || '';
       window.ShapeSound.loadFromText(code);
+    });
+
+    // Extend the example picker for two extra demos (example4, example5).
+    // shapesound.js already handles example1..3 — this handler only intercepts 4 & 5.
+    document.getElementById('example-picker')?.addEventListener('change', (e) => {
+      const val = e.target.value;
+      if (!val) return;
+
+      const extras = {
+        example4: `canvas 800 600
+background #0b1022
+tempo 90
+// three bouncing circles (as live sprites via ids)
+circle 200 120 28 color #13F1FF id=c1
+circle 400 180 28 color #FAFF00 id=c2
+circle 600 140 28 color #FF3CAC id=c3
+physics on
+bounds canvas
+gravity 0 180
+damping 0.995
+setvel c1 60 -40
+setvel c2 -40 -20
+setvel c3 80 -70
+sequence { C4 E4 G4 C5 }`,
+
+        example5: `canvas 800 600
+backgroundnoise 1.2 0.16 color #0b1022 #1c2a4a
+tempo 110
+// drifting polys under a smooth flow field + path drift
+poly 180 300 60 6 color #4CC9F0 id=p1 rot 10
+poly 400 300 55 5 color #F72585 id=p2 rot -6
+poly 620 300 52 7 color #4361EE id=p3 rot 12
+field noise id=f1 scale 0.006 speed 0.22 strength 34
+behavior p1 use f1 mix 0.8
+behavior p2 use f1 mix 0.8
+behavior p3 use f1 mix 0.8
+animate sprite p1 20 180 1 -> 780 180 1 duration 9s ease in-out
+animate sprite p2 20 300 1 -> 780 300 1 duration 9s ease in-out
+animate sprite p3 20 420 1 -> 780 420 1 duration 9s ease in-out
+sequence { C4 D4 E4 G4 }`
+      };
+
+      if (extras[val]) {
+        document.getElementById('code').value = extras[val];
+      }
+      // If user selects example1..3, shapesound.js' built-in handler will populate the code.
     });
 
     // Audio: init/resume + volume + meter
@@ -400,7 +443,6 @@ behavior b3 use f1 mix 0.8</textarea>
       const tick = () => {
         const lv = hooks.getLevels?.();
         if (lv && typeof lv.rms === 'number') {
-          // map ~0..1 -> width%
           const pct = Math.max(0, Math.min(1, lv.rms * 3)) * 100; // modest gain
           meterBar.style.width = pct.toFixed(1) + '%';
         }
@@ -410,7 +452,6 @@ behavior b3 use f1 mix 0.8</textarea>
     }
 
     document.getElementById('init-audio')?.addEventListener('click', () => {
-      // Resumes the shared AudioContext
       try { window.ShapeSound?.hooks?.getAC(); } catch (e) {}
       startMeter();
     });
@@ -451,7 +492,6 @@ behavior b3 use f1 mix 0.8</textarea>
 
     // Kick the meter once the page is interacted with (optional)
     window.addEventListener('click', () => {
-      // safe-guard: the shapesound.js also unlocks on click; we just ensure meter starts
       startMeter();
     }, { once: true, passive: true });
   </script>
