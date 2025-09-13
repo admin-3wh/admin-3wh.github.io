@@ -95,7 +95,7 @@
       gap: 8px;
       align-items: center;
     }
-    button, select, input[type="range"] {
+    button, select, input[type="range"], input[type="number"], input[type="text"] {
       background: var(--btn);
       color: var(--text);
       border: 1px solid #243055;
@@ -103,6 +103,7 @@
       padding: 8px 10px;
       font-size: 13px;
     }
+    input[type="number"], input[type="text"] { width: 100%; }
     button:hover { background: var(--btn-hover); cursor: pointer; }
     button.primary {
       background: var(--accent);
@@ -185,6 +186,24 @@
     .footer-note { color: var(--muted); font-size: 12px; text-align: center; padding: 6px 0 2px; }
     a { color: var(--ok); text-decoration: none; }
     a:hover { text-decoration: underline; }
+
+    /* Small audio meter */
+    .meter {
+      height: 10px;
+      border-radius: 6px;
+      background: #0c1230;
+      border: 1px solid #1b2440;
+      overflow: hidden;
+      position: relative;
+    }
+    .meter .bar {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #2dd4bf, #7c5cff);
+      transition: width 80ms linear;
+    }
+    .mini-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .mini-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
   </style>
 </head>
 <body>
@@ -275,18 +294,75 @@ behavior b2 use f1 mix 0.8
 behavior b3 use f1 mix 0.8</textarea>
           <div class="row" style="grid-template-columns: repeat(2,1fr); gap:8px;">
             <button id="copy-code">Copy Code</button>
-            <button id="run" class="primary">Run Scene</button>
+            <button id="run2" class="primary">Run Scene</button>
           </div>
         </div>
 
+        <!-- NEW: Audio controls -->
         <div class="row">
-          <h2>Saved Scenes</h2>
-          <div class="row" style="grid-template-columns: 1fr auto auto; gap:8px;">
-            <select id="saved-scenes">
-              <option value="">Select Saved Scene</option>
+          <h2>Audio</h2>
+          <div class="mini-grid">
+            <button id="init-audio" title="Resume / init the shared AudioContext">Init/Resume Audio</button>
+            <div>
+              <div class="muted" style="font-size:12px;margin-bottom:4px;">Volume</div>
+              <input id="volume" type="range" min="0" max="1" step="0.01" value="1" style="width:100%; accent-color: var(--accent);" />
+            </div>
+          </div>
+          <div class="muted" style="font-size:12px;">Output Level</div>
+          <div class="meter"><div id="meter-bar" class="bar"></div></div>
+        </div>
+
+        <!-- NEW: Physics controls -->
+        <div class="row">
+          <h2>Physics</h2>
+          <div class="mini-grid-3">
+            <button id="physics-on">Enable</button>
+            <button id="physics-off">Disable</button>
+            <select id="bounds">
+              <option value="none">Bounds: none</option>
+              <option value="canvas">Bounds: canvas</option>
             </select>
-            <button id="save-scene">Save</button>
-            <button id="delete-scene">Delete</button>
+          </div>
+          <div class="mini-grid">
+            <div>
+              <div class="muted" style="font-size:12px;margin-bottom:4px;">Gravity X</div>
+              <input id="grav-x" type="number" step="1" value="0">
+            </div>
+            <div>
+              <div class="muted" style="font-size:12px;margin-bottom:4px;">Gravity Y</div>
+              <input id="grav-y" type="number" step="1" value="0">
+            </div>
+          </div>
+          <div>
+            <div class="muted" style="font-size:12px;margin-bottom:4px;">Damping (0.90–1.00+)</div>
+            <input id="damping" type="number" step="0.01" value="1.0">
+          </div>
+          <div class="mini-grid">
+            <div>
+              <div class="muted" style="font-size:12px;margin-bottom:4px;">Sprite Id</div>
+              <input id="sprite-id" type="text" placeholder="e.g. b1">
+            </div>
+            <div>
+              <div class="muted" style="font-size:12px;margin-bottom:4px;">Impulse (ix, iy)</div>
+              <div class="mini-grid">
+                <input id="imp-x" type="number" step="1" value="120">
+                <input id="imp-y" type="number" step="1" value="-60">
+              </div>
+            </div>
+          </div>
+          <div class="mini-grid">
+            <button id="apply-gravity">Apply Gravity/Damping/Bounds</button>
+            <button id="apply-impulse">Apply Impulse</button>
+          </div>
+          <div class="mini-grid">
+            <div>
+              <div class="muted" style="font-size:12px;margin-bottom:4px;">Set Velocity (vx, vy)</div>
+              <div class="mini-grid">
+                <input id="vel-x" type="number" step="1" value="0">
+                <input id="vel-y" type="number" step="1" value="0">
+              </div>
+            </div>
+            <button id="apply-vel" style="align-self:end;">Set Velocity</button>
           </div>
         </div>
 
@@ -302,5 +378,82 @@ behavior b3 use f1 mix 0.8</textarea>
 
   <!-- Your engine -->
   <script type="module" src="shapesound.js"></script>
+
+  <!-- Wire extra UI to ShapeSound.hooks -->
+  <script>
+    // Secondary Run button (the top one is already wired by shapesound.js)
+    document.getElementById('run2')?.addEventListener('click', () => {
+      const code = document.getElementById('code').value || '';
+      window.ShapeSound.loadFromText(code);
+    });
+
+    // Audio: init/resume + volume + meter
+    const vol = document.getElementById('volume');
+    const meterBar = document.getElementById('meter-bar');
+    let meterRAF = null;
+
+    function startMeter() {
+      cancelAnimationFrame(meterRAF);
+      const hooks = window.ShapeSound?.hooks;
+      if (!hooks) return;
+
+      const tick = () => {
+        const lv = hooks.getLevels?.();
+        if (lv && typeof lv.rms === 'number') {
+          // map ~0..1 -> width%
+          const pct = Math.max(0, Math.min(1, lv.rms * 3)) * 100; // modest gain
+          meterBar.style.width = pct.toFixed(1) + '%';
+        }
+        meterRAF = requestAnimationFrame(tick);
+      };
+      meterRAF = requestAnimationFrame(tick);
+    }
+
+    document.getElementById('init-audio')?.addEventListener('click', () => {
+      // Resumes the shared AudioContext
+      try { window.ShapeSound?.hooks?.getAC(); } catch (e) {}
+      startMeter();
+    });
+
+    vol?.addEventListener('input', (e) => {
+      const v = parseFloat(e.target.value);
+      window.ShapeSound?.hooks?.setMasterVolume?.(isFinite(v) ? v : 1);
+    });
+
+    // Physics controls
+    const hooks = () => window.ShapeSound?.hooks;
+    document.getElementById('physics-on')?.addEventListener('click', () => hooks()?.setPhysics(true));
+    document.getElementById('physics-off')?.addEventListener('click', () => hooks()?.setPhysics(false));
+
+    document.getElementById('apply-gravity')?.addEventListener('click', () => {
+      const gx = parseFloat(document.getElementById('grav-x').value);
+      const gy = parseFloat(document.getElementById('grav-y').value);
+      const d  = parseFloat(document.getElementById('damping').value);
+      const b  = document.getElementById('bounds').value;
+      hooks()?.setGravity(isFinite(gx)?gx:0, isFinite(gy)?gy:0);
+      hooks()?.setDamping(isFinite(d)?d:1);
+      hooks()?.setBounds(b === 'canvas' ? 'canvas' : 'none');
+    });
+
+    document.getElementById('apply-impulse')?.addEventListener('click', () => {
+      const id = (document.getElementById('sprite-id').value || '').trim();
+      const ix = parseFloat(document.getElementById('imp-x').value);
+      const iy = parseFloat(document.getElementById('imp-y').value);
+      if (id) hooks()?.impulse(id, isFinite(ix)?ix:0, isFinite(iy)?iy:0);
+    });
+
+    document.getElementById('apply-vel')?.addEventListener('click', () => {
+      const id = (document.getElementById('sprite-id').value || '').trim();
+      const vx = parseFloat(document.getElementById('vel-x').value);
+      const vy = parseFloat(document.getElementById('vel-y').value);
+      if (id) hooks()?.setVel(id, isFinite(vx)?vx:0, isFinite(vy)?vy:0);
+    });
+
+    // Kick the meter once the page is interacted with (optional)
+    window.addEventListener('click', () => {
+      // safe-guard: the shapesound.js also unlocks on click; we just ensure meter starts
+      startMeter();
+    }, { once: true, passive: true });
+  </script>
 </body>
 </html>
