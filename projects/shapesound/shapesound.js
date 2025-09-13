@@ -83,13 +83,43 @@ function applyEase(t, ease) {
 let AC = null;
 let audioUnlocked = false;
 
+// Master chain (so TinyGPT & others can meter / control volume)
+// We create lazily at first audio use.
+let MASTER = {
+  gain: null,        // GainNode
+  analyser: null,    // AnalyserNode
+  levelBuf: null,    // Float32Array for analysis
+  volume: 1.0
+};
+
 function getAC() {
   if (!AC) AC = new (window.AudioContext || window.webkitAudioContext)();
   if (AC.state === 'suspended') {
     AC.resume().catch(() => {});
   }
+  ensureMasterChain();
   return AC;
 }
+
+function ensureMasterChain() {
+  const ctx = AC || new (window.AudioContext || window.webkitAudioContext)();
+  AC = ctx;
+  if (!MASTER.gain) {
+    MASTER.gain = ctx.createGain();
+    MASTER.gain.gain.value = MASTER.volume;
+
+    MASTER.analyser = ctx.createAnalyser();
+    MASTER.analyser.fftSize = 512;            // small & cheap
+    MASTER.analyser.smoothingTimeConstant = 0.7;
+
+    MASTER.levelBuf = new Float32Array(MASTER.analyser.fftSize / 2);
+
+    // master: [sources]-> gain -> analyser -> destination
+    MASTER.gain.connect(MASTER.analyser);
+    MASTER.analyser.connect(ctx.destination);
+  }
+}
+
 function unlockAudioOnce() {
   if (audioUnlocked) return;
   audioUnlocked = true;
@@ -106,9 +136,15 @@ function playTone(freq, duration = 1) {
   osc.type = "sine";
   osc.frequency.value = freq;
   osc.connect(gain);
-  gain.connect(ctx.destination);
-  osc.start();
-  osc.stop(ctx.currentTime + duration);
+  // Route through master gain so analyser/volume work globally
+  gain.connect(MASTER.gain);
+  // quick envelope (tiny click guard)
+  const now = ctx.currentTime;
+  gain.gain.setValueAtTime(0, now);
+  gain.gain.linearRampToValueAtTime(0.9, now + 0.01);
+  gain.gain.linearRampToValueAtTime(0.0, now + Math.max(0.05, duration));
+  osc.start(now);
+  osc.stop(now + Math.max(0.06, duration + 0.01));
 }
 
 function playSequence(notes) {
@@ -120,6 +156,32 @@ function playSequence(notes) {
       time += beat;
     }
   }
+}
+
+// Optional lightweight output metering (poll on demand)
+function getLevels() {
+  if (!MASTER.analyser) return { rms: 0, peak: 0, spectrum: null };
+  MASTER.analyser.getFloatFrequencyData(MASTER.levelBuf);
+  // Convert to 0..1: analyser returns dB values (negative). We'll compute a crude RMS in linear space.
+  // Map dB to linear, average a midband window (avoid DC extremes).
+  let sum = 0, peak = -Infinity, n = 0;
+  for (let i = 4; i < MASTER.levelBuf.length - 4; i++) {
+    const db = MASTER.levelBuf[i];
+    if (!isFinite(db)) continue;
+    const lin = Math.pow(10, db / 20); // 1.0 at 0 dB
+    sum += lin * lin;
+    if (db > peak) peak = db;
+    n++;
+  }
+  const rms = Math.sqrt(sum / Math.max(1, n));
+  const peakLin = Math.pow(10, (isFinite(peak) ? peak : -100) / 20);
+  return { rms: rms, peak: peakLin, spectrum: null };
+}
+
+function setMasterVolume(v) {
+  ensureMasterChain();
+  MASTER.volume = Math.max(0, Math.min(1, Number(v) || 0));
+  MASTER.gain.gain.value = MASTER.volume;
 }
 
 // ------------------------------
@@ -1051,6 +1113,12 @@ function loop(now, ctx, canvas) {
     return t < 1;
   });
 
+  // Optional: compute current output levels for consumers
+  if (MASTER.analyser) {
+    // We just call it to keep state "hot"; consumers can call ShapeSound.hooks.getLevels() too.
+    getLevels();
+  }
+
   // timeline scrubber reflect progress
   const scrubber = document.getElementById("timeline-scrubber");
   if (scrubber && currentScene.duration) {
@@ -1298,7 +1366,29 @@ window.ShapeSound = {
   },
   render: renderInitial,
   // expose internals (optional)
-  _state: () => ({ tempoBPM, CURRENT_BG, BG_NOISE, DRAWN_OBJECTS, timeline, animations, SPRITES, SEED, FIELDS })
+  _state: () => ({ tempoBPM, CURRENT_BG, BG_NOISE, DRAWN_OBJECTS, timeline, animations, SPRITES, SEED, FIELDS }),
+
+  // ---- Hooks for TinyGPT or snippets ----
+  hooks: {
+    // audio
+    getAC: () => getAC(),
+    setMasterVolume: (v) => setMasterVolume(v),
+    getLevels: () => getLevels(),
+
+    // tempo/seed
+    setTempo: (bpm) => { bpm = Number(bpm); if (isFinite(bpm) && bpm > 0) tempoBPM = bpm; },
+    setSeed: (n) => setSeed(n),
+
+    // physics helpers
+    setPhysics: (on=true) => { PHYSICS.enabled = !!on; },
+    setGravity: (x=0, y=0) => { PHYSICS.gravity.x = Number(x)||0; PHYSICS.gravity.y = Number(y)||0; },
+    setDamping: (d=1) => { PHYSICS.damping = Number(d)||1; },
+    setBounds: (mode='none') => { PHYSICS.bounds = (mode==='canvas')?'canvas':'none'; },
+
+    // sprite nudges
+    impulse: (id, ix=0, iy=0) => { const s = SPRITES[id]; if (s){ s.physics = true; s.vx = (s.vx||0)+Number(ix)||0; s.vy = (s.vy||0)+Number(iy)||0; } },
+    setVel: (id, vx=0, vy=0) => { const s = SPRITES[id]; if (s){ s.physics = true; s.vx = Number(vx)||0; s.vy = Number(vy)||0; } },
+  }
 };
 
 // ------------------------------
