@@ -3,6 +3,7 @@
 import asyncio
 from crawler.scheduler import Scheduler
 from crawler.agent import CrawlerAgent
+from crawler.robots import RobotsHandler
 
 SEED_URLS = [
     "https://example.com",
@@ -15,23 +16,27 @@ async def run_crawler():
 
     scheduler = Scheduler()
     agent = CrawlerAgent()
+    robots = RobotsHandler()
 
-    # Queue initial seed URLs
     for url in SEED_URLS:
         await scheduler.enqueue(url)
 
-    # Main crawl loop
     while not scheduler.is_empty():
         url = await scheduler.dequeue()
         if url is None:
             break
 
+        print(f"[*] Checking robots.txt: {url}")
+        if not await robots.is_allowed(url):
+            print(f"[x] Skipped (robots.txt disallow): {url}")
+            continue
+
         print(f"[*] Crawling: {url}")
         content = await agent.fetch(url)
 
         if content:
-            # Placeholder: future step to process & route content to ETL
             print(f"[✓] {url} fetched, {len(content)} bytes")
+            # ➜ Next: send to fingerprint → dedup → parse pipeline
         else:
             print(f"[x] Failed to fetch: {url}")
 
