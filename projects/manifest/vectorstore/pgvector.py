@@ -48,9 +48,9 @@ class PGVectorStore:
         query_vec = np.array(query_embedding)
         with self.conn.cursor() as cur:
             cur.execute("""
-                SELECT id, source, chunk_index, text, embedding <-> %s AS distance
+                SELECT id, source, chunk_index, text, embedding <-> %s::vector AS distance
                 FROM documents
-                ORDER BY embedding <-> %s
+                ORDER BY embedding <-> %s::vector
                 LIMIT %s;
-            """, (query_vec.tolist(), query_vec.tolist(), top_k))
+            """, (query_embedding, query_embedding, top_k))
             return cur.fetchall()
