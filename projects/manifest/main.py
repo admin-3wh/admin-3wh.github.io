@@ -4,6 +4,9 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from vectorstore.pgvector import PGVectorStore  # Assuming existing vector logic is here
 from services.embedder import generate_embedding  # Will be created next
+from routes import alerts
+app.include_router(alerts.router, prefix="/alerts")
+
 
 app = FastAPI()
 store = PGVectorStore()
