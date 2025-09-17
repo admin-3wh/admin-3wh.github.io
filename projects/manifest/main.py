@@ -6,6 +6,9 @@ from vectorstore.pgvector import PGVectorStore  # Assuming existing vector logic
 from services.embedder import generate_embedding  # Will be created next
 from routes import alerts
 app.include_router(alerts.router, prefix="/alerts")
+from routes import digest
+app.include_router(digest.router, prefix="/digest")
+
 
 
 app = FastAPI()
