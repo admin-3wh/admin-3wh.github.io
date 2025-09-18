@@ -1,27 +1,39 @@
-# Phase 5 Kickoff: main.py (FastAPI Entrypoint)
+# projects/manifest/main.py
 
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from vectorstore.pgvector import PGVectorStore  # Assuming existing vector logic is here
-from services.embedder import generate_embedding  # Will be created next
-from routes import alerts
+
+from vectorstore.pgvector import PGVectorStore
+from services.embedder import generate_embedding
+
+from routes import alerts, digest  # Make sure these are correctly structured with routers
+
+# Initialize FastAPI app
+app = FastAPI()
+
+# Add CORS (important for React)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Replace * with your frontend origin in prod
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Include routers
 app.include_router(alerts.router, prefix="/alerts")
-from routes import digest
 app.include_router(digest.router, prefix="/digest")
 
-
-
-app = FastAPI()
+# Vector store
 store = PGVectorStore()
 
-# ----------------------
-# /search Endpoint
-# ----------------------
-
+# Search schema
 class SearchQuery(BaseModel):
     query: str
     top_k: int = 5
 
+# Main /search route
 @app.post("/search")
 async def search_docs(search: SearchQuery):
     try:
@@ -30,15 +42,3 @@ async def search_docs(search: SearchQuery):
         return {"results": results}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
-# ----------------------
-# Placeholder routes
-# ----------------------
-
-@app.get("/alerts")
-def get_alerts():
-    return {"alerts": []}  # Will be replaced in /api/alerts.py
-
-@app.get("/digest")
-def digest():
-    return {"message": "Digest placeholder"}
