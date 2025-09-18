@@ -1,10 +1,12 @@
-import SearchPanel from './components/SearchPanel';
+// src/App.jsx
+import React from 'react';
+import Dashboard from './pages/Dashboard';
 
 function App() {
   return (
-    <div className="min-h-screen bg-white text-gray-900">
-      <SearchPanel />
-    </div>
+    <main className="min-h-screen bg-[#0b0f1a] text-white font-sans">
+      <Dashboard />
+    </main>
   );
 }
 
