@@ -7,34 +7,35 @@ from pydantic import BaseModel
 from vectorstore.pgvector import PGVectorStore
 from services.embedder import generate_embedding
 
-from routes import alerts, digest  # Ensure these are properly importing 'router'
+from routes import alerts, digest
 
 app = FastAPI()
 
-# CORS for frontend integration
+# Root health check
+@app.get("/")
+def health():
+    return {"message": "Manifest API is alive."}
+
+# CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Replace with your frontend domain in prod
+    allow_origins=["*"],  # Set your frontend origin in prod
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Route registration under /api
+# Use /api prefix for clarity
 app.include_router(alerts.router, prefix="/api/alerts")
 app.include_router(digest.router, prefix="/api/digest")
 
-# Optional root route for testing
-@app.get("/")
-def root():
-    return {"message": "Manifest API is alive"}
+# Vector search endpoint
+store = PGVectorStore()
 
-# Vector store search schema
 class SearchQuery(BaseModel):
     query: str
     top_k: int = 5
 
-# /api/search endpoint
 @app.post("/api/search")
 async def search_docs(search: SearchQuery):
     try:
