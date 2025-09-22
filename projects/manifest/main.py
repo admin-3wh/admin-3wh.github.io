@@ -7,34 +7,35 @@ from pydantic import BaseModel
 from vectorstore.pgvector import PGVectorStore
 from services.embedder import generate_embedding
 
-from routes import alerts, digest  # Make sure these are correctly structured with routers
+from routes import alerts, digest  # Ensure these are properly importing 'router'
 
-# Initialize FastAPI app
 app = FastAPI()
 
-# Add CORS (important for React)
+# CORS for frontend integration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Replace * with your frontend origin in prod
+    allow_origins=["*"],  # Replace with your frontend domain in prod
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Include routers
-app.include_router(alerts.router, prefix="/alerts")
-app.include_router(digest.router, prefix="/digest")
+# Route registration under /api
+app.include_router(alerts.router, prefix="/api/alerts")
+app.include_router(digest.router, prefix="/api/digest")
 
-# Vector store
-store = PGVectorStore()
+# Optional root route for testing
+@app.get("/")
+def root():
+    return {"message": "Manifest API is alive"}
 
-# Search schema
+# Vector store search schema
 class SearchQuery(BaseModel):
     query: str
     top_k: int = 5
 
-# Main /search route
-@app.post("/search")
+# /api/search endpoint
+@app.post("/api/search")
 async def search_docs(search: SearchQuery):
     try:
         query_embedding = generate_embedding(search.query)
