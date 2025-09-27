@@ -7,7 +7,7 @@ from uuid import UUID
 import numpy as np
 
 class PGVectorStore:
-    def __init__(self, dsn: str = "postgresql://user2:newpassword123@localhost:5432/manifest"):
+    def __init__(self, dsn: str = "postgresql://user2:newpassword123@localhost:5432/manifest_db"):
         self.dsn = dsn
         self.conn = psycopg.connect(self.dsn, row_factory=dict_row)
         self._ensure_pgvector_extension()
