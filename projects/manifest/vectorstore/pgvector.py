@@ -3,8 +3,9 @@
 import psycopg
 from psycopg.rows import dict_row
 from typing import List, Dict
-from uuid import UUID
+from uuid import UUID, uuid4
 import numpy as np
+from datetime import datetime
 
 class PGVectorStore:
     def __init__(self, dsn: str = "postgresql://user2:newpassword123@localhost:5432/manifest_db"):
@@ -33,6 +34,7 @@ class PGVectorStore:
             """)
             self.conn.commit()
 
+    # Existing low‑level insert method
     def insert_documents(self, docs: List[Dict]):
         with self.conn.cursor() as cur:
             for doc in docs:
@@ -50,6 +52,18 @@ class PGVectorStore:
                     doc.get("entities", [])
                 ))
             self.conn.commit()
+
+    # NEW high‑level add_documents for ingest.py
+    def add_documents(self, docs: List[Dict]):
+        """
+        Wrapper for ingest.py. If no UUID/timestamp supplied, it will create them.
+        """
+        for d in docs:
+            if "id" not in d:
+                d["id"] = str(uuid4())
+            if "timestamp" not in d:
+                d["timestamp"] = datetime.utcnow()
+        self.insert_documents(docs)
 
     def search(self, query_embedding: List[float], top_k: int = 5) -> List[Dict]:
         with self.conn.cursor() as cur:
