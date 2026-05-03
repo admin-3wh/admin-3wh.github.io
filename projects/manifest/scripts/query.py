@@ -10,9 +10,9 @@ load_dotenv()
 DB_CONFIG = {
     "host": os.getenv("POSTGRES_HOST", "localhost"),
     "port": os.getenv("POSTGRES_PORT", "5432"),
-    "user": os.getenv("POSTGRES_USER", "manifest_user"),
-    "password": os.getenv("POSTGRES_PASSWORD", ""),
-    "dbname": os.getenv("POSTGRES_DB", "manifest"),
+    "user": os.getenv("POSTGRES_USER", "user2"),
+    "password": os.getenv("POSTGRES_PASSWORD", "newpassword123"),
+    "dbname": os.getenv("POSTGRES_DB", "manifest_db"),
 }
 
 model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")

@@ -1,36 +1,40 @@
-# scripts/ingest.py
-
-import os
-from dotenv import load_dotenv
-from vectorstore.pgvector import PGVectorStore
+import uuid
+from datetime import datetime
 from sentence_transformers import SentenceTransformer
-from uuid import uuid4
+from vectorstore.pgvector import PGVectorStore
 
-load_dotenv()
-
-# You can swap in OpenAI or keep this fast local model for now
-EMBEDDING_MODEL = SentenceTransformer("all-MiniLM-L6-v2")
-
+# initialize the store
 store = PGVectorStore()
 
-def ingest_text(title: str, text: str):
-    # Chunking (can be made more advanced)
-    chunks = [text[i:i+500] for i in range(0, len(text), 500)]
-    embeddings = EMBEDDING_MODEL.encode(chunks)
+# load the embedding model
+model = SentenceTransformer("all-MiniLM-L6-v2")
 
-    documents = [
-        {
-            "id": str(uuid4()),
-            "content": chunk,
-            "embedding": embedding.tolist(),
-            "metadata": {"source": title}
-        }
-        for chunk, embedding in zip(chunks, embeddings)
-    ]
+def ingest_text(source: str, text: str):
+    """
+    Take a text string, split into chunks (right now just one chunk),
+    embed it, and insert into PGVector.
+    """
+    chunks = [text]  # later you can add real chunking here
+    documents = []
 
+    for idx, chunk in enumerate(chunks):
+        #  define embedding inside the loop
+        embedding = model.encode(chunk).tolist()
+
+        documents.append({
+            "id": str(uuid.uuid4()),
+            "source": source,
+            "chunk_index": idx,
+            "text": chunk,
+            "embedding": embedding,
+            "timestamp": datetime.now(),
+            "entities": []
+        })
+
+    # use add_documents function
     store.add_documents(documents)
-    print(f"Ingested {len(documents)} chunks from '{title}'.")
 
-if __name__ == "__main__":
-    sample_text = "Manifest is a modular AI-powered web crawler and intelligence system."
-    ingest_text("Sample Source", sample_text)
+# --- test ingestion ---
+sample_text = "This is a test document for Manifest ingestion."
+ingest_text("Sample Source", sample_text)
+print("Ingestion complete.")
