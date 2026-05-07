@@ -1,0 +1,81 @@
+# apps/biomed/biomed_config.yaml
+
+app_name: "Manifest Biomed Intelligence"
+
+description: >
+  Focused biomedical research crawler for antibody research, immunology,
+  SPLA2/SPLA2-1B, longevity, homeostasis, and inflammation.
+
+topics:
+  - antibody research
+  - immunological research
+  - SPLA2 research
+  - SPLA2-1B research
+  - PLA2G1B research
+  - longevity research
+  - homeostasis
+  - inflammation
+  - immunosenescence
+  - inflammaging
+
+synonyms:
+  SPLA2:
+    - secretory phospholipase A2
+    - sPLA2
+    - phospholipase A2
+  SPLA2-1B:
+    - sPLA2-IB
+    - secretory phospholipase A2 group IB
+    - PLA2G1B
+    - group IB phospholipase A2
+  inflammation:
+    - inflammatory response
+    - immune activation
+    - cytokine response
+    - chronic inflammation
+  longevity:
+    - lifespan extension
+    - healthy aging
+    - homeostasis
+    - immunosenescence
+    - inflammaging
+  antibody:
+    - antibodies
+    - immunoglobulin
+    - monoclonal antibody
+    - antibody response
+
+preferred_domains:
+  - pubmed.ncbi.nlm.nih.gov
+  - ncbi.nlm.nih.gov
+  - nih.gov
+  - nature.com
+  - science.org
+  - cell.com
+  - frontiersin.org
+  - mdpi.com
+  - biorxiv.org
+  - medrxiv.org
+  - plos.org
+  - springer.com
+  - sciencedirect.com
+
+blocked_domains:
+  - facebook.com
+  - x.com
+  - twitter.com
+  - instagram.com
+  - tiktok.com
+  - reddit.com
+
+ingestion:
+  max_tokens_per_chunk: 500
+  min_text_length: 300
+  default_top_k: 7
+
+output:
+  include_sources: true
+  include_key_findings: true
+  include_mechanisms: true
+  include_relevance_to_longevity: true
+  include_limitations: true
