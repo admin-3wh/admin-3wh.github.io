@@ -14,6 +14,7 @@ class PGVectorStore:
         self.conn = psycopg.connect(self.dsn, row_factory=dict_row)
         self._ensure_pgvector_extension()
         self._create_table()
+        self._ensure_indexes()
 
     def _ensure_pgvector_extension(self):
         with self.conn.cursor() as cur:
@@ -35,6 +36,27 @@ class PGVectorStore:
             """)
             self.conn.commit()
 
+    def _ensure_indexes(self):
+        """
+        Create indexes for source lookup and duplicate prevention.
+
+        NOTE:
+        The unique index may fail if duplicate source/chunk_index rows
+        already exist. If that happens, run the duplicate cleanup SQL first.
+        """
+        with self.conn.cursor() as cur:
+            cur.execute("""
+                CREATE INDEX IF NOT EXISTS idx_documents_source
+                ON documents (source);
+            """)
+
+            cur.execute("""
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_documents_source_chunk
+                ON documents (source, chunk_index);
+            """)
+
+            self.conn.commit()
+
     def insert_documents(self, docs: List[Dict]):
         with self.conn.cursor() as cur:
             for doc in docs:
@@ -49,7 +71,7 @@ class PGVectorStore:
                         entities
                     )
                     VALUES (%s, %s, %s, %s, %s, %s, %s)
-                    ON CONFLICT (id) DO NOTHING;
+                    ON CONFLICT (source, chunk_index) DO NOTHING;
                 """, (
                     UUID(doc["id"]),
                     doc["source"],
