@@ -1,6 +1,7 @@
 # apps/biomed/biomed_extract.py
 
 import re
+import time
 import requests
 from bs4 import BeautifulSoup
 
@@ -44,16 +45,33 @@ SECTION_KEYWORDS = [
 ]
 
 
+HEADERS = {
+    "User-Agent": "ManifestBiomedBot/0.1 (+https://3wh.dev)"
+}
+
+
+def fetch_with_retries(url: str, timeout: int = 30, max_retries: int = 5) -> str:
+    for attempt in range(max_retries):
+        response = requests.get(
+            url,
+            timeout=timeout,
+            headers=HEADERS,
+        )
+
+        if response.status_code == 429:
+            wait = 5 * (attempt + 1)
+            print(f"Rate limited. Waiting {wait}s before retry...")
+            time.sleep(wait)
+            continue
+
+        response.raise_for_status()
+        return response.text
+
+    raise RuntimeError(f"Request failed after {max_retries} retries: {url}")
+
+
 def fetch_html(url: str) -> str:
-    response = requests.get(
-        url,
-        timeout=30,
-        headers={
-            "User-Agent": "ManifestBiomedBot/0.1 (+https://3wh.dev)"
-        },
-    )
-    response.raise_for_status()
-    return response.text
+    return fetch_with_retries(url)
 
 
 def fetch_pmc_oai_xml(pmc_id: str) -> str:
@@ -63,15 +81,7 @@ def fetch_pmc_oai_xml(pmc_id: str) -> str:
         "&metadataPrefix=pmc"
     )
 
-    response = requests.get(
-        oai_url,
-        timeout=30,
-        headers={
-            "User-Agent": "ManifestBiomedBot/0.1 (+https://3wh.dev)"
-        },
-    )
-    response.raise_for_status()
-    return response.text
+    return fetch_with_retries(oai_url)
 
 
 def extract_pmc_id(url: str) -> str:
@@ -305,6 +315,7 @@ def extract_biomed_url(url: str) -> dict:
 
         if not pmc_id:
             html_result["source"] = url
+            html_result["extraction_method"] = "html_blocked"
             return html_result
 
         xml = fetch_pmc_oai_xml(pmc_id)
