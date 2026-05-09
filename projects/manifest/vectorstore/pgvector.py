@@ -4,8 +4,9 @@ import psycopg
 from psycopg.rows import dict_row
 from typing import List, Dict
 from uuid import UUID, uuid4
-import numpy as np
-from datetime import datetime
+from datetime import datetime, UTC
+from psycopg.types.json import Jsonb
+
 
 class PGVectorStore:
     def __init__(self, dsn: str = "postgresql://user2:newpassword123@localhost:5432/manifest_db"):
@@ -34,12 +35,19 @@ class PGVectorStore:
             """)
             self.conn.commit()
 
-    # Existing low‑level insert method
     def insert_documents(self, docs: List[Dict]):
         with self.conn.cursor() as cur:
             for doc in docs:
                 cur.execute("""
-                    INSERT INTO documents (id, source, chunk_index, text, embedding, timestamp, entities)
+                    INSERT INTO documents (
+                        id,
+                        source,
+                        chunk_index,
+                        text,
+                        embedding,
+                        timestamp,
+                        entities
+                    )
                     VALUES (%s, %s, %s, %s, %s, %s, %s)
                     ON CONFLICT (id) DO NOTHING;
                 """, (
@@ -49,26 +57,41 @@ class PGVectorStore:
                     doc["text"],
                     doc["embedding"],
                     doc["timestamp"],
-                    doc.get("entities", [])
+                    Jsonb(doc.get("entities", []))
                 ))
+
             self.conn.commit()
 
-    # NEW high‑level add_documents for ingest.py
     def add_documents(self, docs: List[Dict]):
         """
-        Wrapper for ingest.py. If no UUID/timestamp supplied, it will create them.
+        High-level insert wrapper.
+
+        If no UUID/timestamp is supplied, it creates them.
         """
-        for d in docs:
-            if "id" not in d:
-                d["id"] = str(uuid4())
-            if "timestamp" not in d:
-                d["timestamp"] = datetime.utcnow()
+        for doc in docs:
+            if "id" not in doc:
+                doc["id"] = str(uuid4())
+
+            if "timestamp" not in doc:
+                doc["timestamp"] = datetime.now(UTC)
+
         self.insert_documents(docs)
 
     def search(self, query_embedding: List[float], top_k: int = 5) -> List[Dict]:
+        """
+        Vector similarity search.
+
+        Returns source text, metadata/entities, and vector distance.
+        """
         with self.conn.cursor() as cur:
             cur.execute("""
-                SELECT id, source, chunk_index, text, embedding <-> %s::vector AS distance
+                SELECT
+                    id,
+                    source,
+                    chunk_index,
+                    text,
+                    entities,
+                    embedding <-> %s::vector AS distance
                 FROM documents
                 ORDER BY embedding <-> %s::vector
                 LIMIT %s;
@@ -77,4 +100,9 @@ class PGVectorStore:
                 query_embedding,
                 top_k
             ))
+
             return cur.fetchall()
+
+    def close(self):
+        if self.conn:
+            self.conn.close()
