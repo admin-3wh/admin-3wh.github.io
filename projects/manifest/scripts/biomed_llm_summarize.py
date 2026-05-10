@@ -10,6 +10,8 @@ from sentence_transformers import SentenceTransformer
 
 from vectorstore.pgvector import PGVectorStore
 from services.llm import LLMService
+from export.biomed_report_exporter import save_markdown_report
+from services.biomed_synthesis import compress_context, build_clean_biomed_prompt
 
 
 model = SentenceTransformer("all-MiniLM-L6-v2")
@@ -82,33 +84,67 @@ Source chunks:
 """
 
 
-def local_structured_fallback(query: str, chunks):
-    print("\n" + "=" * 80)
-    print("MANIFEST LOCAL STRUCTURED BRIEF")
-    print("=" * 80)
+def build_fallback_text(query: str, chunks):
+    lines = []
 
-    print(f"\nQuery:\n{query}")
+    lines.append("# Manifest Local Structured Brief")
+    lines.append("")
+    lines.append(f"## Query")
+    lines.append(query)
+    lines.append("")
 
     if not chunks:
-        print("\nNo biomedical chunks found.")
-        return
+        lines.append("No biomedical chunks found.")
+        return "\n".join(lines)
 
-    print("\nRetrieved Evidence Chunks:")
-    print("-" * 80)
+    lines.append("## Retrieved Evidence Chunks")
+    lines.append("")
 
     for i, row in enumerate(chunks, 1):
         entities = row.get("entities") or {}
         title = entities.get("title", "") if isinstance(entities, dict) else ""
 
-        print(f"\n[{i}] {title}")
-        print(f"Source: {row.get('source')}")
-        print(f"Chunk: {row.get('chunk_index')}")
-        print(f"Distance: {row.get('distance')}")
-        print(row.get("text", "")[:900] + "...")
+        lines.append(f"### [{i}] {title}")
+        lines.append(f"- **Source:** {row.get('source')}")
+        lines.append(f"- **Chunk:** {row.get('chunk_index')}")
+        lines.append(f"- **Distance:** {row.get('distance')}")
+        lines.append("")
+        lines.append(row.get("text", "")[:900] + "...")
+        lines.append("")
 
-    print("\nNote:")
-    print("-" * 80)
-    print("This is local fallback mode. Install Ollama or enable OpenAI mode for true synthesis.")
+    lines.append("## Note")
+    lines.append("This is local fallback mode. Install Ollama or enable OpenAI mode for true synthesis.")
+
+    return "\n".join(lines)
+
+
+def local_structured_fallback(query: str, chunks):
+    output = build_fallback_text(query, chunks)
+
+    print("\n" + "=" * 80)
+    print("MANIFEST LOCAL STRUCTURED BRIEF")
+    print("=" * 80)
+    print(output)
+
+    return output
+
+
+def maybe_save_report(query: str, output: str, mode: str, local_model: str, top_k: int, chunks):
+    save_choice = input("\nSave report to Markdown? [y/N]: ").strip().lower()
+
+    if save_choice == "y":
+        path = save_markdown_report(
+            query=query,
+            report_text=output,
+            mode=mode,
+            metadata={
+                "local_model": local_model,
+                "top_k": top_k,
+                "chunks_used": len(chunks),
+            },
+        )
+
+        print(f"\nSaved report to: {path}")
 
 
 def run(mode: str, local_model: str, top_k: int):
@@ -123,10 +159,12 @@ def run(mode: str, local_model: str, top_k: int):
         chunks = retrieve_biomed_chunks(query, top_k=top_k)
 
         if mode == "fallback":
-            local_structured_fallback(query, chunks)
+            output = local_structured_fallback(query, chunks)
+            maybe_save_report(query, output, mode, local_model, top_k, chunks)
             continue
 
-        prompt = build_prompt(query, chunks)
+        compressed_chunks = compress_context(chunks, max_chunks=top_k)
+        prompt = build_clean_biomed_prompt(query, compressed_chunks)
         llm = LLMService(mode=mode, local_model=local_model)
 
         output = llm.generate(prompt)
@@ -135,6 +173,8 @@ def run(mode: str, local_model: str, top_k: int):
         print("MANIFEST SYNTHESIZED RESEARCH BRIEF")
         print("=" * 80)
         print(output)
+
+        maybe_save_report(query, output, mode, local_model, top_k, chunks)
 
 
 if __name__ == "__main__":
