@@ -74,7 +74,7 @@ class LLMService:
                 input=prompt,
                 text=True,
                 capture_output=True,
-                timeout=180,
+                timeout=600,
             )
 
             if result.returncode != 0:
