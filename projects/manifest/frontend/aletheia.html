@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>Aletheia</title>
+
+  <link rel="stylesheet" href="style.css" />
+</head>
+
+<body>
+  <div class="container">
+    <header class="hero">
+      <h1>Aletheia</h1>
+      <p>Private Document Intelligence Infrastructure</p>
+    </header>
+
+    <section class="panel">
+      <h2>Private Intelligence Query</h2>
+
+      <textarea
+        id="queryInput"
+        placeholder="Ask questions about your private documents..."
+      ></textarea>
+
+      <div class="controls">
+
+        <select id="documentScope">
+          <option value="">All documents</option>
+        </select>
+
+        <select id="modeSelect">
+          <option value="local">local</option>
+          <option value="fallback">fallback</option>
+        </select>
+
+        <input
+          id="modelInput"
+          type="text"
+          value="gemma2:2b"
+          placeholder="Local model"
+        />
+
+        <button id="queryBtn">
+          Semantic Query
+        </button>
+
+        <button id="summarizeBtn">
+          Summarize
+        </button>
+
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Upload & Ingest Document</h2>
+
+      <input
+        type="file"
+        id="uploadInput"
+      />
+
+      <button id="uploadBtn">
+        Upload & Ingest
+      </button>
+    </section>
+
+    <section class="panel">
+      <h2>Document Library</h2>
+
+      <button id="documentsBtn">
+        List Documents
+      </button>
+
+      <div id="documents"></div>
+    </section>
+
+    <section class="panel">
+      <h2>Results</h2>
+
+      <div id="results"></div>
+    </section>
+  </div>
+
+  <script src="aletheia.js"></script>
+</body>
+</html>

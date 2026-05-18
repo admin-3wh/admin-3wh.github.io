@@ -15,17 +15,18 @@ from datetime import datetime, UTC
 from sentence_transformers import SentenceTransformer
 
 from apps.aletheia.private_extract import extract_document
+from apps.aletheia.document_registry import DocumentRegistry
 from vectorstore.pgvector import PGVectorStore
 
 
 EMBED_MODEL = SentenceTransformer("all-MiniLM-L6-v2")
 
 store = PGVectorStore()
+registry = DocumentRegistry()
 
 
 def chunk_text(text: str, chunk_size: int = 500):
     words = text.split()
-
     chunks = []
 
     for i in range(0, len(words), chunk_size):
@@ -41,7 +42,6 @@ def ingest_private_document(file_path: str):
     extracted = extract_document(file_path)
 
     text = extracted["text"]
-
     chunks = chunk_text(text)
 
     docs = []
@@ -65,10 +65,22 @@ def ingest_private_document(file_path: str):
 
     store.add_documents(docs)
 
+    registry_row = registry.upsert_document(
+        app="aletheia",
+        filename=extracted["filename"],
+        file_path=extracted["path"],
+        extension=extracted["extension"],
+        text_length=extracted["text_length"],
+        chunks_created=len(docs),
+        document_type=extracted["extension"].replace(".", ""),
+        tags=["private", "aletheia"],
+    )
+
     return {
         "filename": extracted["filename"],
         "chunks_created": len(docs),
         "text_length": extracted["text_length"],
+        "document_id": registry_row["id"],
     }
 
 
@@ -83,5 +95,6 @@ if __name__ == "__main__":
     print("-" * 50)
 
     print(f"Filename: {result['filename']}")
+    print(f"Document ID: {result['document_id']}")
     print(f"Text length: {result['text_length']}")
     print(f"Chunks created: {result['chunks_created']}")
