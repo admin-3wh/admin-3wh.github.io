@@ -14,3 +14,10 @@ pgvector/
 
 # Misc
 .DS_Store
+
+# Application code — lives in its own private repo
+projects/manifest/
+
+# Player data and exports — never commit
+uploads/
+export/
