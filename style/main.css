@@ -176,6 +176,27 @@ h3 { font-size: 1.3rem; letter-spacing: -0.01em; }
 .brand-word { font-size: 1.2rem; letter-spacing: -0.02em; }
 .brand-word .brand-dot { color: var(--accent); }
 
+/* living index mark: the lit "3" cells shimmer like a tube light, never blanking out */
+.brand-mark .bm-grid { opacity: 0.16; }
+.brand-mark .bm-lit circle { animation: bm-flicker 5.5s linear infinite; }
+.brand-mark .bm-lit circle:nth-child(2)  { animation-delay: -0.7s; }
+.brand-mark .bm-lit circle:nth-child(3)  { animation-delay: -1.9s; animation-duration: 6.5s; }
+.brand-mark .bm-lit circle:nth-child(4)  { animation-delay: -3.1s; }
+.brand-mark .bm-lit circle:nth-child(5)  { animation-delay: -2.2s; animation-duration: 4.8s; }
+.brand-mark .bm-lit circle:nth-child(6)  { animation-delay: -4.4s; }
+.brand-mark .bm-lit circle:nth-child(7)  { animation-delay: -1.2s; animation-duration: 7s; }
+.brand-mark .bm-lit circle:nth-child(8)  { animation-delay: -3.7s; }
+.brand-mark .bm-lit circle:nth-child(9)  { animation-delay: -0.4s; animation-duration: 6s; }
+.brand-mark .bm-lit circle:nth-child(10) { animation-delay: -2.9s; }
+.brand-mark .bm-lit circle:nth-child(11) { animation-delay: -5.1s; animation-duration: 5s; }
+@keyframes bm-flicker {
+  0%, 100% { opacity: 1; }
+  6% { opacity: 0.5; } 7% { opacity: 1; }
+  38% { opacity: 1; } 39% { opacity: 0.28; } 41% { opacity: 0.85; } 42% { opacity: 0.4; } 44% { opacity: 1; }
+  68% { opacity: 1; } 69% { opacity: 0.6; } 70% { opacity: 1; }
+  88% { opacity: 1; } 89% { opacity: 0.45; } 90% { opacity: 1; }
+}
+
 .site-nav { display: flex; align-items: center; gap: 0.4rem; }
 .nav-links { display: flex; list-style: none; gap: 0.25rem; align-items: center; }
 .nav-links a {
@@ -609,4 +630,5 @@ body.grabbing, body.grabbing * { cursor: grabbing !important; }
   *, *::before, *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; }
   html.js .reveal { opacity: 1 !important; transform: none !important; }
   .scroll-cue .bar { animation: none; }
+  .brand-mark .bm-lit circle { animation: none !important; opacity: 1 !important; }
 }
