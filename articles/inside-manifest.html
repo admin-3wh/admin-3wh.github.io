@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Inside Manifest: ingest, embed, search, cite — 3wh.dev</title>
+  <title>Inside Manifest: ingest, embed, search, cite · 3wh.dev</title>
   <meta name="description" content="The architecture of Manifest, a document intelligence engine built on FastAPI, PostgreSQL, and pgvector. How content gets in, gets structured, gets retrieved, and comes back with its sources.">
   <meta name="theme-color" content="#0a0b0f">
   <link rel="canonical" href="https://3wh.dev/articles/inside-manifest.html">
@@ -26,13 +26,15 @@
         <svg class="brand-mark" viewBox="0 0 32 32" fill="none" aria-hidden="true">
           <defs>
             <linearGradient id="bmg" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
-              <stop stop-color="#35e0e0"/><stop offset="1" stop-color="#9b8cff"/>
+              <stop stop-color="#ff5a5f"/><stop offset="1" stop-color="#ff8a5c"/>
             </linearGradient>
           </defs>
-          <path d="M8 22 16 8l8 14M8 22h16" stroke="url(#bmg)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>
-          <circle cx="16" cy="8" r="3.3" fill="url(#bmg)"/>
-          <circle cx="8" cy="22" r="3.3" fill="url(#bmg)"/>
-          <circle cx="24" cy="22" r="3.3" fill="url(#bmg)"/>
+          <path d="M15 16 6 8M15 16 25 12M15 16 24 25M15 16 8 24M25 12 24 25M8 24 6 8" stroke="url(#bmg)" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" opacity="0.55"/>
+          <circle cx="15" cy="16" r="3.3" fill="url(#bmg)"/>
+          <circle cx="6" cy="8" r="2.2" fill="url(#bmg)"/>
+          <circle cx="25" cy="12" r="2" fill="url(#bmg)"/>
+          <circle cx="24" cy="25" r="2.4" fill="url(#bmg)"/>
+          <circle cx="8" cy="24" r="1.9" fill="url(#bmg)"/>
         </svg>
         <span class="brand-word">3wh<span class="brand-dot">.dev</span></span>
       </a>
@@ -60,7 +62,7 @@
       <a class="back-link" href="/articles/">← Back to articles</a>
       <h1>Inside Manifest: ingest, embed, search, cite</h1>
       <div class="article-meta">
-        <span>Ben Reppert</span><span>Jun 2026</span><span>~6 min read</span>
+        <span>3wh.dev</span><span>Jun 2026</span><span>~6 min read</span>
       </div>
 
       <div class="article-body">
@@ -82,13 +84,13 @@
           search their embeddings, which keeps the architecture simple: one store, not a separate vector
           database to keep in sync.</p>
 
-        <h2>1 — Ingest</h2>
+        <h2>1 · Ingest</h2>
         <p>Everything starts with acquisition. Manifest accepts documents, URLs, and raw text. Each source
           is parsed into clean text, stripped of the noise that surrounds real content, and tagged with
           metadata so it can be tracked later. The unglamorous work here is most of the work: a retrieval
           system is only ever as good as what it ingested.</p>
 
-        <h2>2 — Embed</h2>
+        <h2>2 · Embed</h2>
         <p>Clean text is chunked into passages and each passage is embedded into a vector, then written to
           pgvector. This is the step that turns a pile of documents into something addressable by meaning.
           Two passages that say the same thing in different words land near each other in vector space,
@@ -97,7 +99,7 @@
           and you lose the context that makes a passage meaningful. The chunk is the unit of truth the rest
           of the system reasons over.</p>
 
-        <h2>3 — Search</h2>
+        <h2>3 · Search</h2>
         <p>A query is embedded the same way the content was, and Manifest runs a vector similarity search
           to pull the passages closest to the question. The result is not a page of blue links. It is the
           specific set of passages most likely to contain the answer, ranked by relevance.</p>
@@ -105,7 +107,7 @@
           corpus that actually address this question." The second one is what makes the system feel like an
           analyst instead of a search box.</p>
 
-        <h2>4 — Cite</h2>
+        <h2>4 · Cite</h2>
         <p>This is the part I care most about. Manifest returns sourced output: the answer comes back
           attached to the passages and documents it was drawn from. You can follow any claim to its origin.</p>
         <blockquote>If you cannot trace an answer to a source, it is not intelligence. It is a guess with

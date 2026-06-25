@@ -1,4 +1,4 @@
-/* 3wh.dev — site-wide behavior: theme, nav, header state, scroll reveals.
+/* 3wh.dev: site-wide behavior: theme, nav, header state, scroll reveals.
    Dark is the default. Light is opt-in and remembered. */
 (function () {
   "use strict";

@@ -1,7 +1,7 @@
 <!-- projects/shapesound/audio.js -->
 <script>
 /*
-  ShapeSoundAudio — tiny audio analyser helper.
+  ShapeSoundAudio: tiny audio analyser helper.
   - attachTo(audioCtx): attaches an AnalyserNode to a provided AudioContext
   - enableMic(): prompts for microphone and analyses it
   - disable(): tears down mic input
