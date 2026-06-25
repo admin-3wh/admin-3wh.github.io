@@ -1,107 +1,149 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Articles</title>
-  <link rel="stylesheet" href="/style/main.css" />
-  <link rel="icon" href="/favicon.ico" type="image/x-icon" />
-  <style>
-    .article-list {
-      max-width: 800px;
-      margin: 2rem auto;
-      padding: 0 1rem;
-    }
-
-    .article-list ul {
-      list-style-type: none;
-      padding: 0;
-      margin-top: 1.5rem;
-    }
-
-    .article-list li {
-      margin-bottom: 2rem;
-    }
-
-    .article-link {
-      display: block;
-      font-size: 1.3rem;
-      font-weight: 600;
-      color: var(--text-color, #222);
-      padding: 0.5rem 0.75rem;
-      border-radius: 6px;
-      background-color: var(--card-bg, #f8f8f8);
-      transition: background-color 0.2s ease, transform 0.1s ease;
-      text-decoration: none;
-    }
-
-    .article-link:hover {
-      background-color: var(--hover-bg, #e2e2e2);
-      transform: translateX(4px);
-    }
-
-    .meta {
-      font-size: 0.9rem;
-      color: #666;
-      margin-left: 0.75rem;
-      margin-top: 0.25rem;
-    }
-
-    html.dark .article-link {
-      background-color: #1e1e1e;
-      color: #f0f0f0;
-    }
-
-    html.dark .article-link:hover {
-      background-color: #2c2c2c;
-    }
-
-    html.dark .meta {
-      color: #aaa;
-    }
-  </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Articles — 3wh.dev</title>
+  <meta name="description" content="Writing on intelligence infrastructure: the thesis behind 3wh.dev, the architecture of Manifest, and notes from the build.">
+  <meta name="theme-color" content="#0a0b0f">
+  <link rel="canonical" href="https://3wh.dev/articles/">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Articles — 3wh.dev">
+  <meta property="og:description" content="Writing on intelligence infrastructure and notes from the build.">
+  <link rel="icon" href="/favicon.ico" type="image/x-icon">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/style/main.css">
+  <script>(function(){var d=document.documentElement;d.classList.add('js');try{if(localStorage.getItem('theme')==='light')d.classList.add('light')}catch(e){}})();</script>
 </head>
 <body>
-  <header>
-    <div class="logo"><a href="/">3wh.dev</a></div>
-    <nav>
-      <ul class="nav-links">
-        <li><a href="/">Home</a></li>
-        <li><a href="/about/">About</a></li>
-        <li><a href="/projects/">Projects</a></li>
-        <li><a href="/articles/">Articles</a></li>
-        <li><a href="/contact/">Contact</a></li>
-      </ul>
-      <div id="theme-toggle">Dark</div>
-      <div id="hamburger" class="hamburger">
-        <span></span>
-        <span></span>
-        <span></span>
-      </div>
-    </nav>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <header class="site-header">
+    <div class="container header-inner">
+      <a class="brand" href="/" aria-label="3wh.dev home">
+        <svg class="brand-mark" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+          <defs>
+            <linearGradient id="bmg" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
+              <stop stop-color="#35e0e0"/><stop offset="1" stop-color="#9b8cff"/>
+            </linearGradient>
+          </defs>
+          <path d="M8 22 16 8l8 14M8 22h16" stroke="url(#bmg)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>
+          <circle cx="16" cy="8" r="3.3" fill="url(#bmg)"/>
+          <circle cx="8" cy="22" r="3.3" fill="url(#bmg)"/>
+          <circle cx="24" cy="22" r="3.3" fill="url(#bmg)"/>
+        </svg>
+        <span class="brand-word">3wh<span class="brand-dot">.dev</span></span>
+      </a>
+      <nav class="site-nav" aria-label="Primary">
+        <ul class="nav-links">
+          <li><a href="/">Home</a></li>
+          <li><a href="/about/">About</a></li>
+          <li><a href="/projects/">Projects</a></li>
+          <li><a href="/articles/" class="is-active" aria-current="page">Articles</a></li>
+          <li><a href="/contact/">Contact</a></li>
+        </ul>
+        <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Switch to light theme">
+          <span class="theme-ico" aria-hidden="true">◐</span>
+          <span class="theme-toggle-label">Light</span>
+        </button>
+        <button id="hamburger" class="hamburger" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links">
+          <span></span><span></span><span></span>
+        </button>
+      </nav>
+    </div>
   </header>
 
-  <main>
-    <section class="intro">
-      <h1>Articles</h1>
-      <p>A collection of writings, thoughts, and insights hosted here.</p>
+  <main id="main">
+    <section class="page-head">
+      <div class="container">
+        <p class="eyebrow reveal">Articles</p>
+        <h1 class="reveal" data-delay="1">Notes from the <span class="grad-text">build.</span></h1>
+        <p class="lead reveal" data-delay="2">
+          Thinking out loud about intelligence infrastructure: the thesis, the architecture, and the
+          decisions behind the work.
+        </p>
+      </div>
     </section>
 
-    <section class="article-list">
-      <ul>
-        <li>
-          <a href="/articles/triager-plus.html" class="article-link">
-            Triager+: From Concept to Execution
+    <section class="section" style="padding-top:0">
+      <div class="container">
+        <div class="post-list reveal">
+          <a class="post" href="/articles/intelligence-infrastructure-thesis.html">
+            <span class="post-date">Jun 2026</span>
+            <span>
+              <span class="post-title">From fragmented to structured: the thesis</span>
+              <span class="post-desc">Why I build intelligence infrastructure, what separates an engine from a chatbot, and why the foundation comes first.</span>
+            </span>
+            <span class="post-arrow" aria-hidden="true">→</span>
           </a>
-          <div class="meta">Written by 3wh Admin · Jul 26, 2025</div>
-        </li>
-        <!-- Future articles can be added below -->
-      </ul>
+          <a class="post" href="/articles/inside-manifest.html">
+            <span class="post-date">Jun 2026</span>
+            <span>
+              <span class="post-title">Inside Manifest: ingest, embed, search, cite</span>
+              <span class="post-desc">The architecture of the foundation, the role of pgvector, and why every answer ships with its sources.</span>
+            </span>
+            <span class="post-arrow" aria-hidden="true">→</span>
+          </a>
+          <a class="post" href="/articles/triager-plus.html">
+            <span class="post-date">Jul 2025</span>
+            <span>
+              <span class="post-title">Triager+: from concept to execution</span>
+              <span class="post-desc">Shipping a minimal, memory-aware ML tool end to end, from model training to a hand-built UI.</span>
+            </span>
+            <span class="post-arrow" aria-hidden="true">→</span>
+          </a>
+        </div>
+      </div>
     </section>
   </main>
 
-  <footer>
-    © 2025 3wh.dev. All rights reserved.
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-inner">
+        <div class="footer-brand">
+          <a class="brand" href="/" aria-label="3wh.dev home">
+            <svg class="brand-mark" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+              <path d="M8 22 16 8l8 14M8 22h16" stroke="var(--accent)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" opacity="0.85"/>
+              <circle cx="16" cy="8" r="3.3" fill="var(--accent)"/>
+              <circle cx="8" cy="22" r="3.3" fill="var(--accent-2)"/>
+              <circle cx="24" cy="22" r="3.3" fill="var(--accent-2)"/>
+            </svg>
+            <span class="brand-word">3wh<span class="brand-dot">.dev</span></span>
+          </a>
+          <p class="footer-tagline">Intelligence infrastructure. Fragmented information, made structured, searchable, and actionable.</p>
+        </div>
+        <div class="footer-col">
+          <h4>Site</h4>
+          <ul>
+            <li><a href="/">Home</a></li>
+            <li><a href="/about/">About</a></li>
+            <li><a href="/projects/">Projects</a></li>
+            <li><a href="/articles/">Articles</a></li>
+            <li><a href="/contact/">Contact</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <h4>Work</h4>
+          <ul>
+            <li><a href="/articles/inside-manifest.html">Manifest</a></li>
+            <li><a href="/projects/triager/">Triager+</a></li>
+            <li><a href="/projects/shapesound/">ShapeSound</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <h4>Elsewhere</h4>
+          <ul>
+            <li><span class="soon">Channels coming soon</span></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <span>© 2026 3wh.dev. All rights reserved.</span>
+        <span class="mono">Hand-built. Static. No framework.</span>
+      </div>
+    </div>
   </footer>
 
   <script src="/script.js"></script>

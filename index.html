@@ -3,38 +3,369 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Home</title>
-  <link rel="stylesheet" href="/style/main.css">
+  <title>3wh.dev — Intelligence infrastructure</title>
+  <meta name="description" content="Ben Reppert builds intelligence infrastructure: systems that turn fragmented information into structured, searchable, actionable intelligence. Manifest is the foundation; verticals are built on top.">
+  <meta name="theme-color" content="#0a0b0f">
+  <link rel="canonical" href="https://3wh.dev/">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://3wh.dev/">
+  <meta property="og:title" content="3wh.dev — Intelligence infrastructure">
+  <meta property="og:description" content="Systems that turn fragmented information into structured, searchable, actionable intelligence. Manifest is the foundation; verticals are built on top.">
+  <meta name="twitter:card" content="summary_large_image">
+
   <link rel="icon" href="/favicon.ico" type="image/x-icon">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/style/main.css">
+  <script>(function(){var d=document.documentElement;d.classList.add('js');try{if(localStorage.getItem('theme')==='light')d.classList.add('light')}catch(e){}})();</script>
 </head>
 <body>
-  <header>
-    <div class="logo"><a href="/">3wh.dev</a></div>
-    <nav>
-      <ul class="nav-links">
-        <li><a href="/">Home</a></li>
-        <li><a href="/about/">About</a></li>
-        <li><a href="/projects/">Projects</a></li>
-        <li><a href="/articles/">Articles</a></li>
-        <li><a href="/contact/">Contact</a></li>
-      </ul>
-      <div id="theme-toggle">Dark</div>
-      <div id="hamburger" class="hamburger">
-        <span></span>
-        <span></span>
-        <span></span>
-      </div>
-    </nav>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <header class="site-header">
+    <div class="container header-inner">
+      <a class="brand" href="/" aria-label="3wh.dev home">
+        <svg class="brand-mark" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+          <defs>
+            <linearGradient id="bmg" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
+              <stop stop-color="#35e0e0"/><stop offset="1" stop-color="#9b8cff"/>
+            </linearGradient>
+          </defs>
+          <path d="M8 22 16 8l8 14M8 22h16" stroke="url(#bmg)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>
+          <circle cx="16" cy="8" r="3.3" fill="url(#bmg)"/>
+          <circle cx="8" cy="22" r="3.3" fill="url(#bmg)"/>
+          <circle cx="24" cy="22" r="3.3" fill="url(#bmg)"/>
+        </svg>
+        <span class="brand-word">3wh<span class="brand-dot">.dev</span></span>
+      </a>
+      <nav class="site-nav" aria-label="Primary">
+        <ul class="nav-links">
+          <li><a href="/" class="is-active" aria-current="page">Home</a></li>
+          <li><a href="/about/">About</a></li>
+          <li><a href="/projects/">Projects</a></li>
+          <li><a href="/articles/">Articles</a></li>
+          <li><a href="/contact/">Contact</a></li>
+        </ul>
+        <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Switch to light theme">
+          <span class="theme-ico" aria-hidden="true">◐</span>
+          <span class="theme-toggle-label">Light</span>
+        </button>
+        <button id="hamburger" class="hamburger" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links">
+          <span></span><span></span><span></span>
+        </button>
+      </nav>
+    </div>
   </header>
-  <main>
-    <section class="intro">
-      <h1>Welcome to 3wh.dev</h1>
-      <p>This is my personal website — a vestibule for apps, articles, projects, and experiments.</p>
+
+  <main id="main">
+    <!-- HERO -->
+    <section class="hero">
+      <canvas id="graph" aria-hidden="true"></canvas>
+      <div class="hero-veil"></div>
+      <div class="container hero-inner">
+        <p class="eyebrow reveal">Intelligence infrastructure</p>
+        <h1 class="reveal" data-delay="1">
+          I turn fragmented information into
+          <span class="grad-text">structured, searchable, actionable</span>
+          intelligence.
+        </h1>
+        <p class="hero-sub reveal" data-delay="2">
+          I'm Ben Reppert. I design systems that ingest scattered documents, web data,
+          and raw text, then make them searchable, sourced, and ready to act on.
+          Manifest is the foundation. The verticals are built on top.
+        </p>
+        <div class="pipeline reveal mono" data-delay="3" aria-hidden="true">
+          <span>ingest</span><i>→</i><span>embed</span><i>→</i><span>search</span><i>→</i><span>cite</span>
+        </div>
+        <div class="hero-cta reveal" data-delay="4">
+          <a class="btn btn-primary" href="/projects/">Explore the work <span class="arrow">→</span></a>
+          <a class="btn btn-ghost" href="/about/">The thesis</a>
+        </div>
+      </div>
+      <div class="scroll-cue" aria-hidden="true"><span class="bar"></span>scroll</div>
+    </section>
+
+    <!-- THESIS FLOW -->
+    <section class="section" id="thesis">
+      <div class="container">
+        <div class="section-head reveal">
+          <p class="eyebrow">The thesis</p>
+          <h2>Information is everywhere. <span class="grad-text">Intelligence is rare.</span></h2>
+          <p>Most useful knowledge is scattered across documents, pages, and inboxes in a form
+            you cannot query. I build the layer that closes that gap, end to end.</p>
+        </div>
+        <div class="flow">
+          <div class="flow-step in-state reveal">
+            <span class="k">Input</span>
+            <h3>Fragmented</h3>
+            <p>PDFs, URLs, raw text, reports, rosters. Real signal, trapped in formats nothing can search.</p>
+          </div>
+          <div class="flow-arrow reveal" data-delay="1" aria-hidden="true">→</div>
+          <div class="flow-step reveal" data-delay="1">
+            <span class="k">Core</span>
+            <h3>Structured</h3>
+            <p>Chunked, embedded, and indexed into a vector store. The corpus becomes addressable.</p>
+          </div>
+          <div class="flow-arrow reveal" data-delay="2" aria-hidden="true">→</div>
+          <div class="flow-step out-state reveal" data-delay="2">
+            <span class="k">Output</span>
+            <h3>Actionable</h3>
+            <p>Sourced answers with citations. Searchable, defensible, and ready to decide on.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ARCHITECTURE -->
+    <section class="section" id="architecture">
+      <div class="container">
+        <div class="arch">
+          <div class="stack reveal" aria-label="Product architecture">
+            <div class="layer-verticals">
+              <div class="layer-vertical">
+                <h4>Playbook</h4>
+                <p>Athletics recruiting intelligence. In development.</p>
+              </div>
+              <div class="layer-vertical">
+                <h4>Blackletter</h4>
+                <p>A second vertical. Exploratory.</p>
+              </div>
+            </div>
+            <div class="layer-connector" aria-hidden="true"></div>
+            <div class="layer">
+              <div class="layer-row">
+                <h3>Aletheia</h3>
+                <span class="chip building"><span class="dot"></span>reasoning</span>
+              </div>
+              <p>The reasoning layer. Multi-source synthesis and analysis on top of the foundation.</p>
+            </div>
+            <div class="layer-connector" aria-hidden="true"></div>
+            <div class="layer layer-foundation">
+              <div class="layer-row">
+                <h3>Manifest</h3>
+                <span class="layer-meta">the foundation</span>
+              </div>
+              <p>Ingest, embed, search, and cite. The infrastructure every vertical runs on.</p>
+            </div>
+          </div>
+          <div class="arch-copy reveal" data-delay="1">
+            <p class="eyebrow">Architecture, not a portfolio</p>
+            <h2>One foundation. <span class="grad-text">Many verticals.</span></h2>
+            <p>This is not a pile of unrelated projects. It is one system, built in layers.
+              <strong>Manifest</strong> handles acquisition and retrieval. <strong>Aletheia</strong>
+              turns retrieval into reasoning. Verticals like <strong>Playbook</strong> apply that
+              intelligence to a specific market.</p>
+            <p>Build the foundation once. Every vertical inherits ingestion, embeddings, search,
+              and sourcing for free, and adds only what its domain needs.</p>
+            <p class="note">Verticals are referenced here as direction. Public demos ship when they are ready.</p>
+          </div>
+        </div>
+
+        <!-- ENGINE PIPELINE -->
+        <div class="section-head reveal" style="margin-top:clamp(3rem,7vw,5rem)">
+          <p class="eyebrow">Inside the foundation</p>
+          <h2>How Manifest thinks</h2>
+        </div>
+        <div class="engine">
+          <div class="engine-step reveal">
+            <span class="n">01</span><h4>Acquire</h4>
+            <p>Ingest documents, URLs, and raw text. Parse, clean, and capture metadata.</p>
+          </div>
+          <div class="engine-step reveal" data-delay="1">
+            <span class="n">02</span><h4>Structure</h4>
+            <p>Chunk content and embed it into a pgvector store for semantic addressing.</p>
+          </div>
+          <div class="engine-step reveal" data-delay="2">
+            <span class="n">03</span><h4>Remember</h4>
+            <p>Track sources and entities so context and provenance survive across queries.</p>
+          </div>
+          <div class="engine-step reveal" data-delay="3">
+            <span class="n">04</span><h4>Reason</h4>
+            <p>Run vector search and synthesis to answer questions, not just match keywords.</p>
+          </div>
+          <div class="engine-step reveal" data-delay="4">
+            <span class="n">05</span><h4>Deliver</h4>
+            <p>Return sourced, cited output through an interface a stranger can navigate.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- EVIDENCE / WORK -->
+    <section class="section" id="work">
+      <div class="container">
+        <div class="section-head reveal">
+          <p class="eyebrow">Evidence</p>
+          <h2>The thesis, proven in code</h2>
+          <p>Shipped tools you can open today, plus the foundation they pointed toward.</p>
+        </div>
+        <div class="cards">
+          <!-- Manifest -->
+          <article class="card is-foundation reveal">
+            <div class="card-top">
+              <svg class="card-glyph" viewBox="0 0 44 44" fill="none" aria-hidden="true">
+                <rect x="6" y="26" width="32" height="10" rx="2" stroke="url(#bmg)" stroke-width="1.6"/>
+                <rect x="11" y="16" width="22" height="8" rx="2" stroke="url(#bmg)" stroke-width="1.4" opacity="0.7"/>
+                <rect x="16" y="8" width="12" height="6" rx="2" stroke="url(#bmg)" stroke-width="1.2" opacity="0.45"/>
+              </svg>
+              <span class="chip building"><span class="dot"></span>foundation</span>
+            </div>
+            <h3>Manifest</h3>
+            <p class="card-desc">A document intelligence engine. FastAPI + PostgreSQL + pgvector. Ingests
+              content, embeds it, runs vector search, and returns sourced answers with citations. Not a chatbot.</p>
+            <div class="tags">
+              <span class="tag">FastAPI</span><span class="tag">PostgreSQL</span><span class="tag">pgvector</span>
+            </div>
+            <a class="card-link" href="/articles/inside-manifest.html">Read the architecture <span class="arrow">→</span></a>
+          </article>
+
+          <!-- Triager+ -->
+          <article class="card reveal" data-delay="1">
+            <div class="card-top">
+              <svg class="card-glyph" viewBox="0 0 44 44" fill="none" aria-hidden="true">
+                <circle cx="14" cy="14" r="5" stroke="url(#bmg)" stroke-width="1.6"/>
+                <circle cx="30" cy="14" r="5" stroke="url(#bmg)" stroke-width="1.6" opacity="0.6"/>
+                <path d="M10 30h24M10 36h16" stroke="url(#bmg)" stroke-width="1.6" stroke-linecap="round"/>
+              </svg>
+              <span class="chip shipped"><span class="dot"></span>shipped</span>
+            </div>
+            <h3>Triager+</h3>
+            <p class="card-desc">A focused ML tool that classifies help-desk tickets by category and priority.
+              FastAPI backend, hand-built static UI. Proof that a model only matters once it ships.</p>
+            <div class="tags">
+              <span class="tag">ML</span><span class="tag">NLP</span><span class="tag">FastAPI</span>
+            </div>
+            <a class="card-link" href="/projects/triager/">Open the tool <span class="arrow">→</span></a>
+          </article>
+
+          <!-- ShapeSound -->
+          <article class="card reveal" data-delay="2">
+            <div class="card-top">
+              <svg class="card-glyph" viewBox="0 0 44 44" fill="none" aria-hidden="true">
+                <path d="M8 22c4-12 8-12 12 0s8 12 12 0" stroke="url(#bmg)" stroke-width="1.6" stroke-linecap="round"/>
+                <rect x="6" y="28" width="6" height="8" rx="1.5" stroke="url(#bmg)" stroke-width="1.4" opacity="0.6"/>
+                <rect x="32" y="28" width="6" height="8" rx="1.5" stroke="url(#bmg)" stroke-width="1.4" opacity="0.6"/>
+              </svg>
+              <span class="chip shipped"><span class="dot"></span>shipped</span>
+            </div>
+            <h3>ShapeSound</h3>
+            <p class="card-desc">A small domain-specific language that turns symbolic input into visuals and audio.
+              An exercise in parsers, compilers, and symbolic systems, running entirely in the browser.</p>
+            <div class="tags">
+              <span class="tag">DSL</span><span class="tag">Compilers</span><span class="tag">WebAudio</span>
+            </div>
+            <a class="card-link" href="/projects/shapesound/">Open the tool <span class="arrow">→</span></a>
+          </article>
+        </div>
+        <p class="card-note reveal">
+          Verticals in development: Aletheia (reasoning), Playbook (athletics recruiting intelligence),
+          Blackletter. No public links yet. See the <a href="/projects/">full architecture →</a>
+        </p>
+      </div>
+    </section>
+
+    <!-- ARTICLES TEASER -->
+    <section class="section" id="writing">
+      <div class="container">
+        <div class="section-head reveal">
+          <p class="eyebrow">Writing</p>
+          <h2>Notes from the build</h2>
+        </div>
+        <div class="post-list reveal" data-delay="1">
+          <a class="post" href="/articles/intelligence-infrastructure-thesis.html">
+            <span class="post-date">Jun 2026</span>
+            <span>
+              <span class="post-title">From fragmented to structured: the thesis</span>
+              <span class="post-desc">Why I build intelligence infrastructure, and what separates an engine from a chatbot.</span>
+            </span>
+            <span class="post-arrow" aria-hidden="true">→</span>
+          </a>
+          <a class="post" href="/articles/inside-manifest.html">
+            <span class="post-date">Jun 2026</span>
+            <span>
+              <span class="post-title">Inside Manifest: ingest, embed, search, cite</span>
+              <span class="post-desc">The architecture of the foundation, and the decisions behind each layer.</span>
+            </span>
+            <span class="post-arrow" aria-hidden="true">→</span>
+          </a>
+          <a class="post" href="/articles/triager-plus.html">
+            <span class="post-date">Jul 2025</span>
+            <span>
+              <span class="post-title">Triager+: from concept to execution</span>
+              <span class="post-desc">Shipping a minimal, memory-aware ML tool end to end, from model to UI.</span>
+            </span>
+            <span class="post-arrow" aria-hidden="true">→</span>
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <!-- CTA -->
+    <section class="section">
+      <div class="container">
+        <div class="cta-band reveal">
+          <p class="eyebrow" style="justify-content:center">Pre-revenue. Building in the open.</p>
+          <h2>I build systems that turn information into an advantage.</h2>
+          <p>If you have information problems costing you time, clarity, or a competitive edge,
+            the foundation is being built for exactly that.</p>
+          <div class="hero-cta">
+            <a class="btn btn-primary" href="/contact/">Get in touch <span class="arrow">→</span></a>
+            <a class="btn btn-ghost" href="/about/">More about me</a>
+          </div>
+        </div>
+      </div>
     </section>
   </main>
-  <footer>
-    © 2025 3wh.dev. All rights reserved.
+
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-inner">
+        <div class="footer-brand">
+          <a class="brand" href="/" aria-label="3wh.dev home">
+            <svg class="brand-mark" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+              <path d="M8 22 16 8l8 14M8 22h16" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" opacity="0.85" style="color:var(--accent)"/>
+              <circle cx="16" cy="8" r="3.3" fill="var(--accent)"/>
+              <circle cx="8" cy="22" r="3.3" fill="var(--accent-2)"/>
+              <circle cx="24" cy="22" r="3.3" fill="var(--accent-2)"/>
+            </svg>
+            <span class="brand-word">3wh<span class="brand-dot">.dev</span></span>
+          </a>
+          <p class="footer-tagline">Intelligence infrastructure. Fragmented information, made structured, searchable, and actionable.</p>
+        </div>
+        <div class="footer-col">
+          <h4>Site</h4>
+          <ul>
+            <li><a href="/">Home</a></li>
+            <li><a href="/about/">About</a></li>
+            <li><a href="/projects/">Projects</a></li>
+            <li><a href="/articles/">Articles</a></li>
+            <li><a href="/contact/">Contact</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <h4>Work</h4>
+          <ul>
+            <li><a href="/articles/inside-manifest.html">Manifest</a></li>
+            <li><a href="/projects/triager/">Triager+</a></li>
+            <li><a href="/projects/shapesound/">ShapeSound</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <h4>Elsewhere</h4>
+          <ul>
+            <li><span class="soon">Channels coming soon</span></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <span>© 2026 3wh.dev. All rights reserved.</span>
+        <span class="mono">Hand-built. Static. No framework.</span>
+      </div>
+    </div>
   </footer>
+
   <script src="/script.js"></script>
+  <script src="/home.js"></script>
 </body>
 </html>

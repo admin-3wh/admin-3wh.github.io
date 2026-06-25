@@ -3,84 +3,263 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Projects</title>
-  <link rel="stylesheet" href="/style/main.css">
+  <title>Projects — 3wh.dev</title>
+  <meta name="description" content="One system, built in layers. Manifest is the foundation; Aletheia adds reasoning; verticals like Playbook apply intelligence to a market. Plus shipped tools: Triager+ and ShapeSound.">
+  <meta name="theme-color" content="#0a0b0f">
+  <link rel="canonical" href="https://3wh.dev/projects/">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Projects — 3wh.dev">
+  <meta property="og:description" content="One system, built in layers: foundation, reasoning, and verticals, plus shipped tools.">
   <link rel="icon" href="/favicon.ico" type="image/x-icon">
-  <style>
-    /* Custom styles for project logos */
-    .projects-grid {
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: center;
-      gap: 2rem;
-      margin-top: 2rem;
-    }
-
-    .project-item {
-      text-align: center;
-      cursor: pointer;
-      transition: transform 0.3s ease, box-shadow 0.3s ease;
-      text-decoration: none; /* Prevent underline on hover */
-    }
-
-    .project-item img {
-      width: 150px;
-      height: auto;
-      transition: transform 0.3s ease, box-shadow 0.3s ease;
-    }
-
-    .project-item:hover img {
-      transform: translateY(-4px) scale(1.05);
-      box-shadow: 0 10px 20px rgba(0,0,0,0.2);
-    }
-
-    .project-title {
-      margin-top: 0.5rem;
-      font-size: 1rem;
-      color: inherit;
-    }
-  </style>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/style/main.css">
+  <script>(function(){var d=document.documentElement;d.classList.add('js');try{if(localStorage.getItem('theme')==='light')d.classList.add('light')}catch(e){}})();</script>
 </head>
 <body>
-  <header>
-    <div class="logo"><a href="/">3wh.dev</a></div>
-    <nav>
-      <ul class="nav-links">
-        <li><a href="/">Home</a></li>
-        <li><a href="/about/">About</a></li>
-        <li><a href="/projects/">Projects</a></li>
-        <li><a href="/articles/">Articles</a></li>
-        <li><a href="/contact/">Contact</a></li>
-      </ul>
-      <div id="theme-toggle">Dark</div>
-      <div id="hamburger" class="hamburger">
-        <span></span>
-        <span></span>
-        <span></span>
-      </div>
-    </nav>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <header class="site-header">
+    <div class="container header-inner">
+      <a class="brand" href="/" aria-label="3wh.dev home">
+        <svg class="brand-mark" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+          <defs>
+            <linearGradient id="bmg" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
+              <stop stop-color="#35e0e0"/><stop offset="1" stop-color="#9b8cff"/>
+            </linearGradient>
+          </defs>
+          <path d="M8 22 16 8l8 14M8 22h16" stroke="url(#bmg)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>
+          <circle cx="16" cy="8" r="3.3" fill="url(#bmg)"/>
+          <circle cx="8" cy="22" r="3.3" fill="url(#bmg)"/>
+          <circle cx="24" cy="22" r="3.3" fill="url(#bmg)"/>
+        </svg>
+        <span class="brand-word">3wh<span class="brand-dot">.dev</span></span>
+      </a>
+      <nav class="site-nav" aria-label="Primary">
+        <ul class="nav-links">
+          <li><a href="/">Home</a></li>
+          <li><a href="/about/">About</a></li>
+          <li><a href="/projects/" class="is-active" aria-current="page">Projects</a></li>
+          <li><a href="/articles/">Articles</a></li>
+          <li><a href="/contact/">Contact</a></li>
+        </ul>
+        <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Switch to light theme">
+          <span class="theme-ico" aria-hidden="true">◐</span>
+          <span class="theme-toggle-label">Light</span>
+        </button>
+        <button id="hamburger" class="hamburger" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links">
+          <span></span><span></span><span></span>
+        </button>
+      </nav>
+    </div>
   </header>
 
-  <main>
-    <section class="intro">
-      <h1>Projects</h1>
-      <p>Here’s a collection of my projects, apps, and experiments.</p>
+  <main id="main">
+    <section class="page-head">
+      <div class="container">
+        <p class="eyebrow reveal">Projects</p>
+        <h1 class="reveal" data-delay="1">One system, <span class="grad-text">built in layers.</span></h1>
+        <p class="lead reveal" data-delay="2">
+          These are not separate products. They are stages of the same idea: a foundation that turns
+          information into intelligence, a reasoning layer on top of it, and verticals that aim it at
+          a market. Two tools have shipped. The foundation is in active development.
+        </p>
+      </div>
     </section>
 
-    <section class="projects-grid">
-      <a class="project-item" href="/projects/triager/">
-        <img src="/projects/triager/img/triager-logo.png" alt="Triager+ logo">
-      </a>
+    <!-- FOUNDATION -->
+    <section class="section" style="padding-top:0">
+      <div class="container">
+        <div class="section-head reveal">
+          <p class="eyebrow">Layer 00 · Foundation</p>
+          <h2>Manifest</h2>
+        </div>
+        <div class="cards">
+          <article class="card is-foundation reveal" style="grid-column:1 / -1">
+            <div class="card-top">
+              <svg class="card-glyph" viewBox="0 0 44 44" fill="none" aria-hidden="true">
+                <rect x="6" y="26" width="32" height="10" rx="2" stroke="url(#bmg)" stroke-width="1.6"/>
+                <rect x="11" y="16" width="22" height="8" rx="2" stroke="url(#bmg)" stroke-width="1.4" opacity="0.7"/>
+                <rect x="16" y="8" width="12" height="6" rx="2" stroke="url(#bmg)" stroke-width="1.2" opacity="0.45"/>
+              </svg>
+              <span class="chip building"><span class="dot"></span>in development</span>
+            </div>
+            <h3 style="font-size:1.5rem">Manifest — the document intelligence engine</h3>
+            <p class="card-desc" style="max-width:62ch">
+              The infrastructure layer everything else runs on. Manifest ingests documents, URLs, and raw
+              text, embeds them into a vector store, runs semantic search, and returns sourced outputs with
+              citations. It is built to be a stranger-demoable intelligence engine, not a chatbot.
+            </p>
+            <div class="tags" style="margin-top:1.2rem">
+              <span class="tag">FastAPI</span><span class="tag">PostgreSQL</span><span class="tag">pgvector</span>
+              <span class="tag">Ingestion</span><span class="tag">Embeddings</span><span class="tag">Vector search</span><span class="tag">Citations</span>
+            </div>
+            <a class="card-link" href="/articles/inside-manifest.html">Read the architecture <span class="arrow">→</span></a>
+          </article>
+        </div>
+      </div>
+    </section>
 
-      <a class="project-item" href="/projects/shapesound/">
-        <img src="/projects/shapesound/img/shapesound-logo.png" alt="ShapeSound logo">
-      </a>
+    <!-- REASONING + VERTICALS -->
+    <section class="section" style="padding-top:0">
+      <div class="container">
+        <div class="section-head reveal">
+          <p class="eyebrow">Layers 01–02 · Reasoning &amp; verticals</p>
+          <h2>Built on top</h2>
+          <p>Direction, not demos. These are referenced to show where the foundation leads. Public
+            demos and links ship only when each is ready.</p>
+        </div>
+        <div class="cards">
+          <article class="card reveal">
+            <div class="card-top">
+              <svg class="card-glyph" viewBox="0 0 44 44" fill="none" aria-hidden="true">
+                <circle cx="22" cy="22" r="4" stroke="url(#bmg)" stroke-width="1.6"/>
+                <circle cx="22" cy="22" r="11" stroke="url(#bmg)" stroke-width="1.3" opacity="0.6"/>
+                <circle cx="22" cy="22" r="17" stroke="url(#bmg)" stroke-width="1" opacity="0.35"/>
+              </svg>
+              <span class="chip building"><span class="dot"></span>reasoning layer</span>
+            </div>
+            <h3>Aletheia</h3>
+            <p class="card-desc">Turns retrieval into reasoning: multi-source synthesis, inference, and analysis
+              on top of Manifest. Answers "what does this mean?", not just "what exists?" Architecture defined.</p>
+            <p class="card-note">Not yet built · no public link</p>
+          </article>
+
+          <article class="card reveal" data-delay="1">
+            <div class="card-top">
+              <svg class="card-glyph" viewBox="0 0 44 44" fill="none" aria-hidden="true">
+                <path d="M10 30V16l12-6 12 6v14" stroke="url(#bmg)" stroke-width="1.6" stroke-linejoin="round"/>
+                <path d="M16 30v-8h12v8" stroke="url(#bmg)" stroke-width="1.4" opacity="0.6"/>
+              </svg>
+              <span class="chip building"><span class="dot"></span>vertical · in development</span>
+            </div>
+            <h3>Playbook</h3>
+            <p class="card-desc">The first vertical: intelligence applied to athletics recruiting. The foundation
+              aimed at how programs discover and evaluate talent. Proof that intelligence systems generate
+              real value in a market.</p>
+            <p class="card-note">Private build · no public demo or data yet</p>
+          </article>
+
+          <article class="card reveal" data-delay="2">
+            <div class="card-top">
+              <svg class="card-glyph" viewBox="0 0 44 44" fill="none" aria-hidden="true">
+                <rect x="12" y="8" width="20" height="28" rx="2" stroke="url(#bmg)" stroke-width="1.6"/>
+                <path d="M17 16h10M17 22h10M17 28h6" stroke="url(#bmg)" stroke-width="1.3" stroke-linecap="round" opacity="0.6"/>
+              </svg>
+              <span class="chip exploring"><span class="dot"></span>exploratory</span>
+            </div>
+            <h3>Blackletter</h3>
+            <p class="card-desc">A second vertical, use case being scoped. Named and gestured at, waiting on the
+              vertical pattern to prove out first. Built on the same foundation when it is time.</p>
+            <p class="card-note">Concept stage · no public link</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- SHIPPED -->
+    <section class="section" style="padding-top:0">
+      <div class="container">
+        <div class="section-head reveal">
+          <p class="eyebrow">Groundwork · Shipped</p>
+          <h2>Proven in code</h2>
+          <p>The earlier work. Smaller in scope, fully finished, and open to use right now. Each taught a
+            piece of what the foundation needed.</p>
+        </div>
+        <div class="cards">
+          <article class="card reveal">
+            <div class="card-top">
+              <svg class="card-glyph" viewBox="0 0 44 44" fill="none" aria-hidden="true">
+                <circle cx="14" cy="14" r="5" stroke="url(#bmg)" stroke-width="1.6"/>
+                <circle cx="30" cy="14" r="5" stroke="url(#bmg)" stroke-width="1.6" opacity="0.6"/>
+                <path d="M10 30h24M10 36h16" stroke="url(#bmg)" stroke-width="1.6" stroke-linecap="round"/>
+              </svg>
+              <span class="chip shipped"><span class="dot"></span>shipped</span>
+            </div>
+            <h3>Triager+</h3>
+            <p class="card-desc">Classifies help-desk tickets by category and priority. A FastAPI backend with a
+              hand-built static UI. The lesson: a model only matters once it is a product someone can use.</p>
+            <div class="tags"><span class="tag">ML</span><span class="tag">NLP</span><span class="tag">Naive Bayes</span><span class="tag">FastAPI</span></div>
+            <a class="card-link" href="/projects/triager/">Open the tool <span class="arrow">→</span></a>
+          </article>
+
+          <article class="card reveal" data-delay="1">
+            <div class="card-top">
+              <svg class="card-glyph" viewBox="0 0 44 44" fill="none" aria-hidden="true">
+                <path d="M8 22c4-12 8-12 12 0s8 12 12 0" stroke="url(#bmg)" stroke-width="1.6" stroke-linecap="round"/>
+                <rect x="6" y="28" width="6" height="8" rx="1.5" stroke="url(#bmg)" stroke-width="1.4" opacity="0.6"/>
+                <rect x="32" y="28" width="6" height="8" rx="1.5" stroke="url(#bmg)" stroke-width="1.4" opacity="0.6"/>
+              </svg>
+              <span class="chip shipped"><span class="dot"></span>shipped</span>
+            </div>
+            <h3>ShapeSound</h3>
+            <p class="card-desc">A domain-specific language that turns symbolic input into visuals and audio. A study
+              in parsers, compilers, and symbolic systems, running entirely in the browser.</p>
+            <div class="tags"><span class="tag">DSL</span><span class="tag">Parser</span><span class="tag">WebAudio</span><span class="tag">Canvas</span></div>
+            <a class="card-link" href="/projects/shapesound/">Open the tool <span class="arrow">→</span></a>
+          </article>
+        </div>
+
+        <div class="cta-band reveal" style="margin-top:clamp(3rem,7vw,5rem)">
+          <h2>See how the foundation works</h2>
+          <p>The architecture behind Manifest, layer by layer.</p>
+          <div class="hero-cta">
+            <a class="btn btn-primary" href="/articles/inside-manifest.html">Inside Manifest <span class="arrow">→</span></a>
+            <a class="btn btn-ghost" href="/articles/">All writing</a>
+          </div>
+        </div>
+      </div>
     </section>
   </main>
 
-  <footer>
-    © 2025 3wh.dev. All rights reserved.
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-inner">
+        <div class="footer-brand">
+          <a class="brand" href="/" aria-label="3wh.dev home">
+            <svg class="brand-mark" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+              <path d="M8 22 16 8l8 14M8 22h16" stroke="var(--accent)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" opacity="0.85"/>
+              <circle cx="16" cy="8" r="3.3" fill="var(--accent)"/>
+              <circle cx="8" cy="22" r="3.3" fill="var(--accent-2)"/>
+              <circle cx="24" cy="22" r="3.3" fill="var(--accent-2)"/>
+            </svg>
+            <span class="brand-word">3wh<span class="brand-dot">.dev</span></span>
+          </a>
+          <p class="footer-tagline">Intelligence infrastructure. Fragmented information, made structured, searchable, and actionable.</p>
+        </div>
+        <div class="footer-col">
+          <h4>Site</h4>
+          <ul>
+            <li><a href="/">Home</a></li>
+            <li><a href="/about/">About</a></li>
+            <li><a href="/projects/">Projects</a></li>
+            <li><a href="/articles/">Articles</a></li>
+            <li><a href="/contact/">Contact</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <h4>Work</h4>
+          <ul>
+            <li><a href="/articles/inside-manifest.html">Manifest</a></li>
+            <li><a href="/projects/triager/">Triager+</a></li>
+            <li><a href="/projects/shapesound/">ShapeSound</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <h4>Elsewhere</h4>
+          <ul>
+            <li><span class="soon">Channels coming soon</span></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <span>© 2026 3wh.dev. All rights reserved.</span>
+        <span class="mono">Hand-built. Static. No framework.</span>
+      </div>
+    </div>
   </footer>
+
   <script src="/script.js"></script>
 </body>
 </html>
