@@ -3,38 +3,195 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Contact</title>
-  <link rel="stylesheet" href="/style/main.css">
+  <title>Contact · 3wh.dev</title>
+  <meta name="description" content="Get in touch about intelligence infrastructure, custom AI systems, and the work behind 3wh.dev.">
+  <meta name="theme-color" content="#0a0b0f">
+  <link rel="canonical" href="https://3wh.dev/contact/">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Contact · 3wh.dev">
+  <meta property="og:description" content="Get in touch about intelligence infrastructure and custom AI systems.">
   <link rel="icon" href="/favicon.ico" type="image/x-icon">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <link rel="manifest" href="/site.webmanifest">
+  <meta property="og:image" content="https://3wh.dev/og.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="https://3wh.dev/og.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/style/main.css">
+  <script>(function(){var d=document.documentElement;d.classList.add('js');try{if(localStorage.getItem('theme')==='light')d.classList.add('light')}catch(e){}})();</script>
 </head>
 <body>
-  <header>
-    <div class="logo"><a href="/">3wh.dev</a></div>
-    <nav>
-      <ul class="nav-links">
-        <li><a href="/">Home</a></li>
-        <li><a href="/about/">About</a></li>
-        <li><a href="/projects/">Projects</a></li>
-        <li><a href="/articles/">Articles</a></li>
-        <li><a href="/contact/">Contact</a></li>
-      </ul>
-      <div id="theme-toggle">Dark</div>
-      <div id="hamburger" class="hamburger">
-        <span></span>
-        <span></span>
-        <span></span>
-    </nav>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <header class="site-header">
+    <div class="container header-inner">
+      <a class="brand" href="/" aria-label="3wh.dev home">
+        <svg class="brand-mark" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+          <defs>
+            <linearGradient id="bmg" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
+              <stop stop-color="#ff5a5f"/><stop offset="1" stop-color="#ff8a5c"/>
+            </linearGradient>
+          </defs>
+          <g class="bm-grid" fill="url(#bmg)">
+            <circle cx="11" cy="7" r="1.5"/><circle cx="16" cy="7" r="1.5"/><circle cx="21" cy="7" r="1.5"/>
+            <circle cx="11" cy="11.5" r="1.5"/><circle cx="16" cy="11.5" r="1.5"/><circle cx="21" cy="11.5" r="1.5"/>
+            <circle cx="11" cy="16" r="1.5"/><circle cx="16" cy="16" r="1.5"/><circle cx="21" cy="16" r="1.5"/>
+            <circle cx="11" cy="20.5" r="1.5"/><circle cx="16" cy="20.5" r="1.5"/><circle cx="21" cy="20.5" r="1.5"/>
+            <circle cx="11" cy="25" r="1.5"/><circle cx="16" cy="25" r="1.5"/><circle cx="21" cy="25" r="1.5"/>
+          </g>
+          <g class="bm-lit" fill="url(#bmg)">
+            <circle cx="11" cy="7" r="1.8"/><circle cx="16" cy="7" r="1.8"/><circle cx="21" cy="7" r="1.8"/>
+            <circle cx="21" cy="11.5" r="1.8"/>
+            <circle cx="11" cy="16" r="1.8"/><circle cx="16" cy="16" r="1.8"/><circle cx="21" cy="16" r="1.8"/>
+            <circle cx="21" cy="20.5" r="1.8"/>
+            <circle cx="11" cy="25" r="1.8"/><circle cx="16" cy="25" r="1.8"/><circle cx="21" cy="25" r="1.8"/>
+          </g>
+        </svg>
+        <span class="brand-word">3wh<span class="brand-dot">.dev</span></span>
+      </a>
+      <nav class="site-nav" aria-label="Primary">
+        <ul class="nav-links">
+          <li><a href="/">Home</a></li>
+          <li><a href="/about/">About</a></li>
+          <li><a href="/projects/">Projects</a></li>
+          <li><a href="/articles/">Articles</a></li>
+          <li><a href="/contact/" class="is-active" aria-current="page">Contact</a></li>
+        </ul>
+        <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Switch to light theme">
+          <span class="theme-ico" aria-hidden="true">◐</span>
+          <span class="theme-toggle-label">Light</span>
+        </button>
+        <button id="hamburger" class="hamburger" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links">
+          <span></span><span></span><span></span>
+        </button>
+      </nav>
+    </div>
   </header>
-  <main>
-    <section class="intro">
-      <h1>Contact</h1>
-      <p>You can reach out to me through this page. Contact form or details will go here.</p>
+
+  <main id="main">
+    <section class="page-head">
+      <div class="container">
+        <p class="eyebrow reveal">Contact</p>
+        <h1 class="reveal" data-delay="1">Let's build something <span class="grad-text">worth paying for.</span></h1>
+        <p class="lead reveal" data-delay="2">
+          If you have an information problem worth solving, a custom AI system in mind, or you just
+          want to talk about intelligence infrastructure, reach out.
+        </p>
+      </div>
+    </section>
+
+    <section class="section" style="padding-top:0">
+      <div class="container">
+        <div class="contact-grid">
+          <div class="contact-card reveal">
+            <h2 style="font-size:1.5rem;margin-bottom:0.4rem">Get in touch</h2>
+            <p class="muted" style="margin-bottom:0.5rem">The best ways to reach me:</p>
+
+            <a class="contact-method" href="mailto:admin@3wh.dev">
+              <span class="ico" aria-hidden="true">@</span>
+              <span>
+                <span class="m-label">Email</span><br>
+                <span class="m-value">admin@3wh.dev</span>
+              </span>
+            </a>
+
+            <a class="contact-method" href="https://github.com/admin-3wh" target="_blank" rel="noopener">
+              <span class="ico" aria-hidden="true">&#9676;</span>
+              <span>
+                <span class="m-label">GitHub</span><br>
+                <span class="m-value">@admin-3wh</span>
+              </span>
+            </a>
+
+            <p class="mono" style="font-size:0.8rem;color:var(--text-faint);margin-top:1.3rem">
+              Email is the fastest way to reach me. For code and project history, GitHub.
+            </p>
+          </div>
+
+          <aside>
+            <div class="panel reveal" data-delay="1">
+              <h3>Good fit</h3>
+              <p class="muted" style="font-size:0.94rem;margin-bottom:1rem">I work best with people who:</p>
+              <ul style="list-style:none;display:flex;flex-direction:column;gap:0.7rem">
+                <li class="mono" style="font-size:0.88rem;color:var(--text-muted)">› have information costing them time or money</li>
+                <li class="mono" style="font-size:0.88rem;color:var(--text-muted)">› value leverage over headcount</li>
+                <li class="mono" style="font-size:0.88rem;color:var(--text-muted)">› see AI as infrastructure, not a toy</li>
+                <li class="mono" style="font-size:0.88rem;color:var(--text-muted)">› want a system, not a one-off script</li>
+              </ul>
+            </div>
+            <div class="panel reveal" data-delay="2">
+              <h3>What I can build</h3>
+              <p class="muted" style="font-size:0.94rem">Research engines, document ingestion and search systems,
+                automation pipelines, and applied AI products. Custom to the problem, built on a foundation that lasts.</p>
+            </div>
+          </aside>
+        </div>
+      </div>
     </section>
   </main>
-  <footer>
-    © 2025 3wh.dev. All rights reserved.
+
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-inner">
+        <div class="footer-brand">
+          <a class="brand" href="/" aria-label="3wh.dev home">
+            <svg class="brand-mark" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+              <g class="bm-grid" fill="var(--accent)">
+                <circle cx="11" cy="7" r="1.5"/><circle cx="16" cy="7" r="1.5"/><circle cx="21" cy="7" r="1.5"/>
+                <circle cx="11" cy="11.5" r="1.5"/><circle cx="16" cy="11.5" r="1.5"/><circle cx="21" cy="11.5" r="1.5"/>
+                <circle cx="11" cy="16" r="1.5"/><circle cx="16" cy="16" r="1.5"/><circle cx="21" cy="16" r="1.5"/>
+                <circle cx="11" cy="20.5" r="1.5"/><circle cx="16" cy="20.5" r="1.5"/><circle cx="21" cy="20.5" r="1.5"/>
+                <circle cx="11" cy="25" r="1.5"/><circle cx="16" cy="25" r="1.5"/><circle cx="21" cy="25" r="1.5"/>
+              </g>
+              <g class="bm-lit" fill="var(--accent)">
+                <circle cx="11" cy="7" r="1.8"/><circle cx="16" cy="7" r="1.8"/><circle cx="21" cy="7" r="1.8"/>
+                <circle cx="21" cy="11.5" r="1.8"/>
+                <circle cx="11" cy="16" r="1.8"/><circle cx="16" cy="16" r="1.8"/><circle cx="21" cy="16" r="1.8"/>
+                <circle cx="21" cy="20.5" r="1.8"/>
+                <circle cx="11" cy="25" r="1.8"/><circle cx="16" cy="25" r="1.8"/><circle cx="21" cy="25" r="1.8"/>
+              </g>
+            </svg>
+            <span class="brand-word">3wh<span class="brand-dot">.dev</span></span>
+          </a>
+          <p class="footer-tagline">Intelligence infrastructure. Fragmented information, made structured, searchable, and actionable.</p>
+        </div>
+        <div class="footer-col">
+          <h4>Site</h4>
+          <ul>
+            <li><a href="/">Home</a></li>
+            <li><a href="/about/">About</a></li>
+            <li><a href="/projects/">Projects</a></li>
+            <li><a href="/articles/">Articles</a></li>
+            <li><a href="/contact/">Contact</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <h4>Work</h4>
+          <ul>
+            <li><a href="/articles/inside-manifest.html">Manifest</a></li>
+            <li><a href="/projects/triager/">Triager+</a></li>
+            <li><a href="/projects/shapesound/">ShapeSound</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <h4>Elsewhere</h4>
+          <ul>
+            <li><a href="mailto:admin@3wh.dev">Email</a></li>
+            <li><a href="https://github.com/admin-3wh" target="_blank" rel="noopener">GitHub</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <span>© 2026 3wh.dev. All rights reserved.</span>
+        <span class="mono">Hand-built. Static. No framework.</span>
+      </div>
+    </div>
   </footer>
+
   <script src="/script.js"></script>
 </body>
 </html>
-

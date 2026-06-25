@@ -1,7 +1,7 @@
 <!-- projects/shapesound/inspector.js -->
 <script>
 /*
-  ShapeSound Inspector — lightweight overlay for live stats + knobs.
+  ShapeSound Inspector: lightweight overlay for live stats + knobs.
   - Shows FPS, counts, audio levels
   - Lets you tweak physics (gravity/damping/bounds) at runtime
 */
@@ -54,9 +54,9 @@
     const root = el('div', { class:'ss-inspector', id:'ss-inspector' }, [
       el('h4', { html:'<span>Inspector</span><span class="close">✕</span>' }),
       el('div', { class:'rows mini' }, [
-        el('div', { html:'FPS' }), el('div', { id:'ss-fps', html:'—' }),
-        el('div', { html:'Sprites' }), el('div', { id:'ss-sprites', html:'—' }),
-        el('div', { html:'Shapes' }), el('div', { id:'ss-shapes', html:'—' }),
+        el('div', { html:'FPS' }), el('div', { id:'ss-fps', html:'·' }),
+        el('div', { html:'Sprites' }), el('div', { id:'ss-sprites', html:'·' }),
+        el('div', { html:'Shapes' }), el('div', { id:'ss-shapes', html:'·' }),
       ]),
       el('div', { class:'rows rowfull', style:'margin-top:6px;' }, [
         el('div', { class:'rowfull', html:'Audio Levels' }),
@@ -129,9 +129,9 @@
       // counters
       try {
         const st = window.ShapeSound?._state?.();
-        spEl.textContent = st ? Object.keys(st.SPRITES || {}).length : '—';
-        shEl.textContent = st ? (st.DRAWN_OBJECTS || []).length : '—';
-      } catch { spEl.textContent = shEl.textContent = '—'; }
+        spEl.textContent = st ? Object.keys(st.SPRITES || {}).length : '·';
+        shEl.textContent = st ? (st.DRAWN_OBJECTS || []).length : '·';
+      } catch { spEl.textContent = shEl.textContent = '·'; }
 
       // audio bars
       const levels = window.ShapeSoundAudio?.getLevels?.() || {low:0,mid:0,high:0};

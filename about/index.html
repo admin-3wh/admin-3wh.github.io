@@ -3,37 +3,233 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>About</title>
-  <link rel="stylesheet" href="/style/main.css">
+  <title>About · 3wh.dev</title>
+  <meta name="description" content="An intelligence systems engineer building Manifest, a document intelligence foundation, and the verticals that run on top of it.">
+  <meta name="theme-color" content="#0a0b0f">
+  <link rel="canonical" href="https://3wh.dev/about/">
+  <meta property="og:type" content="profile">
+  <meta property="og:title" content="About · 3wh.dev">
+  <meta property="og:description" content="Intelligence systems engineer. Building Manifest and the verticals on top of it.">
   <link rel="icon" href="/favicon.ico" type="image/x-icon">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <link rel="manifest" href="/site.webmanifest">
+  <meta property="og:image" content="https://3wh.dev/og.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="https://3wh.dev/og.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/style/main.css">
+  <script>(function(){var d=document.documentElement;d.classList.add('js');try{if(localStorage.getItem('theme')==='light')d.classList.add('light')}catch(e){}})();</script>
 </head>
 <body>
-  <header>
-    <div class="logo"><a href="/">3wh.dev</a></div>
-    <nav>
-      <ul class="nav-links">
-        <li><a href="/">Home</a></li>
-        <li><a href="/about/">About</a></li>
-        <li><a href="/projects/">Projects</a></li>
-        <li><a href="/articles/">Articles</a></li>
-        <li><a href="/contact/">Contact</a></li>
-      </ul>
-      <div id="theme-toggle">Dark</div>
-      <div id="hamburger" class="hamburger">
-        <span></span>
-        <span></span>
-        <span></span>
-    </nav>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <header class="site-header">
+    <div class="container header-inner">
+      <a class="brand" href="/" aria-label="3wh.dev home">
+        <svg class="brand-mark" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+          <defs>
+            <linearGradient id="bmg" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
+              <stop stop-color="#ff5a5f"/><stop offset="1" stop-color="#ff8a5c"/>
+            </linearGradient>
+          </defs>
+          <g class="bm-grid" fill="url(#bmg)">
+            <circle cx="11" cy="7" r="1.5"/><circle cx="16" cy="7" r="1.5"/><circle cx="21" cy="7" r="1.5"/>
+            <circle cx="11" cy="11.5" r="1.5"/><circle cx="16" cy="11.5" r="1.5"/><circle cx="21" cy="11.5" r="1.5"/>
+            <circle cx="11" cy="16" r="1.5"/><circle cx="16" cy="16" r="1.5"/><circle cx="21" cy="16" r="1.5"/>
+            <circle cx="11" cy="20.5" r="1.5"/><circle cx="16" cy="20.5" r="1.5"/><circle cx="21" cy="20.5" r="1.5"/>
+            <circle cx="11" cy="25" r="1.5"/><circle cx="16" cy="25" r="1.5"/><circle cx="21" cy="25" r="1.5"/>
+          </g>
+          <g class="bm-lit" fill="url(#bmg)">
+            <circle cx="11" cy="7" r="1.8"/><circle cx="16" cy="7" r="1.8"/><circle cx="21" cy="7" r="1.8"/>
+            <circle cx="21" cy="11.5" r="1.8"/>
+            <circle cx="11" cy="16" r="1.8"/><circle cx="16" cy="16" r="1.8"/><circle cx="21" cy="16" r="1.8"/>
+            <circle cx="21" cy="20.5" r="1.8"/>
+            <circle cx="11" cy="25" r="1.8"/><circle cx="16" cy="25" r="1.8"/><circle cx="21" cy="25" r="1.8"/>
+          </g>
+        </svg>
+        <span class="brand-word">3wh<span class="brand-dot">.dev</span></span>
+      </a>
+      <nav class="site-nav" aria-label="Primary">
+        <ul class="nav-links">
+          <li><a href="/">Home</a></li>
+          <li><a href="/about/" class="is-active" aria-current="page">About</a></li>
+          <li><a href="/projects/">Projects</a></li>
+          <li><a href="/articles/">Articles</a></li>
+          <li><a href="/contact/">Contact</a></li>
+        </ul>
+        <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Switch to light theme">
+          <span class="theme-ico" aria-hidden="true">◐</span>
+          <span class="theme-toggle-label">Light</span>
+        </button>
+        <button id="hamburger" class="hamburger" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links">
+          <span></span><span></span><span></span>
+        </button>
+      </nav>
+    </div>
   </header>
-  <main>
-    <section class="intro">
-      <h1>About</h1>
-      <p>This page tells visitors more about the purpose and creator of 3wh.dev.</p>
+
+  <main id="main">
+    <section class="page-head">
+      <div class="container">
+        <p class="eyebrow reveal">About</p>
+        <h1 class="reveal" data-delay="1">I build the layer between <span class="grad-text">raw information</span> and a decision.</h1>
+        <p class="lead reveal" data-delay="2">
+          I'm an intelligence systems engineer. My work is designing, deploying, and
+          operating AI-driven systems that ingest information, organize it, reason over it, and turn
+          scattered data into intelligence someone can act on.
+        </p>
+      </div>
+    </section>
+
+    <section class="section" style="padding-top:0">
+      <div class="container">
+        <div class="about-grid">
+          <div class="prose reveal">
+            <h2 style="margin-bottom:1.2rem">The work</h2>
+            <p>My offer is intelligence infrastructure: research engines, document ingestion systems,
+              and applied AI products that turn messy information, scattered documents, web data, and
+              underused knowledge into something <strong>structured, searchable, and actionable</strong>.
+              The form changes by customer. The core value does not.</p>
+            <p>I treat AI as infrastructure, not a chatbot. The interesting problem is rarely the model.
+              It is the system around it: how content gets in, how it is structured, how it is retrieved,
+              and how an answer arrives with its sources attached.</p>
+
+            <h2 style="margin:2.4rem 0 1.2rem">The arc</h2>
+            <p>Every project I have shipped is a stage of the same system, not a separate product.
+              The through line is intelligence amplification: how do you build a machine that finds
+              what matters before everyone else does?</p>
+            <p><strong>Triager+</strong> proved I could take a model the whole way to a usable product.
+              <strong>ShapeSound</strong> was a study in language design, parsers, and symbolic systems.
+              <strong>Manifest</strong> is the graduation piece: a document intelligence engine and the
+              foundation everything else now runs on. <strong>Aletheia</strong> adds the reasoning layer,
+              and verticals like <strong>Playbook</strong> apply the intelligence to a specific market.</p>
+            <p>Build the foundation once. Every vertical inherits ingestion, embeddings, search, and
+              sourcing, and adds only what its domain needs.</p>
+
+            <h2 style="margin:2.4rem 0 1.2rem">Where I am</h2>
+            <p>Pre-revenue, in the product development and validation phase. Manifest, Aletheia, and the
+              verticals are being built as portfolio-grade systems, and the progression is documented here
+              in public. The immediate goal is building something valuable enough to justify
+              commercializing it. I am pursuing a master's in machine learning and AI alongside the build.</p>
+          </div>
+
+          <aside>
+            <div class="panel reveal" data-delay="1">
+              <h3>Profile</h3>
+              <div class="spec">
+                <div class="spec-row"><span class="k">Role</span><span class="v">Intelligence systems engineer</span></div>
+                <div class="spec-row"><span class="k">Focus</span><span class="v">Ingestion · embeddings · retrieval · synthesis</span></div>
+                <div class="spec-row"><span class="k">Foundation</span><span class="v">Manifest (FastAPI · PostgreSQL · pgvector)</span></div>
+                <div class="spec-row"><span class="k">Education</span><span class="v">B.S. IT Management · M.S. ML/AI (in progress)</span></div>
+                <div class="spec-row"><span class="k">Stage</span><span class="v">Pre-revenue · building in the open</span></div>
+              </div>
+            </div>
+            <div class="panel reveal" data-delay="2">
+              <h3>Who this is for</h3>
+              <p class="muted" style="font-size:0.94rem">Operators, founders, and researchers with information
+                problems costing them time, money, or a competitive edge. Best fit: people who treat AI as
+                infrastructure and value leverage.</p>
+            </div>
+          </aside>
+        </div>
+
+        <div class="principles">
+          <div class="principle reveal">
+            <span class="n">01</span>
+            <h3>Infrastructure over demos</h3>
+            <p>A demo impresses once. Infrastructure compounds. I build the part that keeps paying off.</p>
+          </div>
+          <div class="principle reveal" data-delay="1">
+            <span class="n">02</span>
+            <h3>Sourced, not guessed</h3>
+            <p>Every answer carries its citations. If it cannot be traced to a source, it is not intelligence.</p>
+          </div>
+          <div class="principle reveal" data-delay="2">
+            <span class="n">03</span>
+            <h3>One foundation, many verticals</h3>
+            <p>Solve the hard part once. Let each domain inherit it and add only what is unique.</p>
+          </div>
+          <div class="principle reveal" data-delay="3">
+            <span class="n">04</span>
+            <h3>Ship the edges</h3>
+            <p>A system is clearest at its boundaries. Scope tight, finish it, then expand.</p>
+          </div>
+        </div>
+
+        <div class="cta-band reveal" style="margin-top:clamp(3rem,7vw,5rem)">
+          <h2>Want the longer version?</h2>
+          <p>Read the thesis in full, or see the architecture proven in code.</p>
+          <div class="hero-cta">
+            <a class="btn btn-primary" href="/articles/intelligence-infrastructure-thesis.html">Read the thesis <span class="arrow">→</span></a>
+            <a class="btn btn-ghost" href="/projects/">See the work</a>
+          </div>
+        </div>
+      </div>
     </section>
   </main>
-  <footer>
-    © 2025 3wh.dev. All rights reserved.
+
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-inner">
+        <div class="footer-brand">
+          <a class="brand" href="/" aria-label="3wh.dev home">
+            <svg class="brand-mark" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+              <g class="bm-grid" fill="var(--accent)">
+                <circle cx="11" cy="7" r="1.5"/><circle cx="16" cy="7" r="1.5"/><circle cx="21" cy="7" r="1.5"/>
+                <circle cx="11" cy="11.5" r="1.5"/><circle cx="16" cy="11.5" r="1.5"/><circle cx="21" cy="11.5" r="1.5"/>
+                <circle cx="11" cy="16" r="1.5"/><circle cx="16" cy="16" r="1.5"/><circle cx="21" cy="16" r="1.5"/>
+                <circle cx="11" cy="20.5" r="1.5"/><circle cx="16" cy="20.5" r="1.5"/><circle cx="21" cy="20.5" r="1.5"/>
+                <circle cx="11" cy="25" r="1.5"/><circle cx="16" cy="25" r="1.5"/><circle cx="21" cy="25" r="1.5"/>
+              </g>
+              <g class="bm-lit" fill="var(--accent)">
+                <circle cx="11" cy="7" r="1.8"/><circle cx="16" cy="7" r="1.8"/><circle cx="21" cy="7" r="1.8"/>
+                <circle cx="21" cy="11.5" r="1.8"/>
+                <circle cx="11" cy="16" r="1.8"/><circle cx="16" cy="16" r="1.8"/><circle cx="21" cy="16" r="1.8"/>
+                <circle cx="21" cy="20.5" r="1.8"/>
+                <circle cx="11" cy="25" r="1.8"/><circle cx="16" cy="25" r="1.8"/><circle cx="21" cy="25" r="1.8"/>
+              </g>
+            </svg>
+            <span class="brand-word">3wh<span class="brand-dot">.dev</span></span>
+          </a>
+          <p class="footer-tagline">Intelligence infrastructure. Fragmented information, made structured, searchable, and actionable.</p>
+        </div>
+        <div class="footer-col">
+          <h4>Site</h4>
+          <ul>
+            <li><a href="/">Home</a></li>
+            <li><a href="/about/">About</a></li>
+            <li><a href="/projects/">Projects</a></li>
+            <li><a href="/articles/">Articles</a></li>
+            <li><a href="/contact/">Contact</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <h4>Work</h4>
+          <ul>
+            <li><a href="/articles/inside-manifest.html">Manifest</a></li>
+            <li><a href="/projects/triager/">Triager+</a></li>
+            <li><a href="/projects/shapesound/">ShapeSound</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <h4>Elsewhere</h4>
+          <ul>
+            <li><a href="mailto:admin@3wh.dev">Email</a></li>
+            <li><a href="https://github.com/admin-3wh" target="_blank" rel="noopener">GitHub</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <span>© 2026 3wh.dev. All rights reserved.</span>
+        <span class="mono">Hand-built. Static. No framework.</span>
+      </div>
+    </div>
   </footer>
+
   <script src="/script.js"></script>
 </body>
 </html>
