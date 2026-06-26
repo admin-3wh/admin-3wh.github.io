@@ -98,3 +98,85 @@
 
   revealEls.forEach(function (el) { io.observe(el); });
 })();
+
+/* ============================================================
+   Wayfinding: scroll progress, section node-nav + scrollspy,
+   and the interactive architecture stack. All progressive
+   enhancement; the page is complete without any of it.
+   ============================================================ */
+(function () {
+  "use strict";
+  var reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  /* scroll progress bar */
+  var bar = document.createElement("div");
+  bar.className = "scroll-progress";
+  bar.setAttribute("aria-hidden", "true");
+  document.body.appendChild(bar);
+  var doc = document.documentElement;
+  function progress() {
+    var max = doc.scrollHeight - doc.clientHeight;
+    bar.style.width = (max > 0 ? (doc.scrollTop / max) * 100 : 0) + "%";
+  }
+  progress();
+  window.addEventListener("scroll", progress, { passive: true });
+  window.addEventListener("resize", progress);
+
+  /* section node-nav + scrollspy (pages opt in via data-nav) */
+  var secs = Array.prototype.slice.call(document.querySelectorAll("[data-nav]"));
+  if (secs.length >= 2 && "IntersectionObserver" in window) {
+    var nav = document.createElement("nav");
+    nav.className = "pagenav";
+    nav.setAttribute("aria-label", "Page sections");
+    var btns = secs.map(function (s, i) {
+      if (!s.id) s.id = "sec-" + i;
+      var b = document.createElement("button");
+      b.type = "button";
+      var label = s.getAttribute("data-nav");
+      b.setAttribute("aria-label", label);
+      b.innerHTML = '<span class="nd"></span><span class="nl"></span>';
+      b.querySelector(".nl").textContent = label;
+      b.addEventListener("click", function () {
+        s.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
+      });
+      nav.appendChild(b);
+      return b;
+    });
+    document.body.appendChild(nav);
+    var spy = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (e.isIntersecting) {
+          var idx = secs.indexOf(e.target);
+          btns.forEach(function (b, i) { b.classList.toggle("active", i === idx); });
+        }
+      });
+    }, { rootMargin: "-45% 0px -50% 0px", threshold: 0 });
+    secs.forEach(function (s) { spy.observe(s); });
+  }
+
+  /* interactive architecture stack */
+  var stack = document.querySelector(".stack");
+  var detail = document.querySelector(".stack-detail");
+  if (stack && detail) {
+    var layers = Array.prototype.slice.call(stack.querySelectorAll("[data-detail]"));
+    var def = detail.innerHTML;
+    var select = function (el) {
+      layers.forEach(function (l) { l.classList.toggle("sel", l === el); });
+      stack.classList.add("has-sel");
+      detail.innerHTML = el.getAttribute("data-detail");
+    };
+    var clear = function () {
+      layers.forEach(function (l) { l.classList.remove("sel"); });
+      stack.classList.remove("has-sel");
+      detail.innerHTML = def;
+    };
+    layers.forEach(function (l) {
+      l.tabIndex = 0;
+      l.addEventListener("mouseenter", function () { select(l); });
+      l.addEventListener("focus", function () { select(l); });
+      l.addEventListener("click", function () { select(l); });
+    });
+    stack.addEventListener("mouseleave", clear);
+    stack.addEventListener("focusout", function (e) { if (!stack.contains(e.relatedTarget)) clear(); });
+  }
+})();

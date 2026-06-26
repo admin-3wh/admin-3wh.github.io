@@ -20,9 +20,8 @@
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
   <meta name="twitter:image" content="https://3wh.dev/og.png">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="preload" href="/fonts/grotesk-var.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/fonts/inter-var.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="/style/main.css">
   <script>(function(){var d=document.documentElement;d.classList.add('js');try{if(localStorage.getItem('theme')==='light')d.classList.add('light')}catch(e){}})();</script>
 </head>
@@ -76,7 +75,7 @@
 
   <main id="main">
     <!-- HERO -->
-    <section class="hero">
+    <section class="hero" id="top" data-nav="Intro">
       <canvas id="graph" aria-hidden="true"></canvas>
       <div class="hero-veil"></div>
       <div class="container hero-inner">
@@ -95,15 +94,15 @@
           <span>ingest</span><i>→</i><span>embed</span><i>→</i><span>search</span><i>→</i><span>cite</span>
         </div>
         <div class="hero-cta reveal" data-delay="4">
-          <a class="btn btn-primary" href="/projects/">Explore the work <span class="arrow">→</span></a>
-          <a class="btn btn-ghost" href="/about/">The thesis</a>
+          <a class="btn btn-primary" href="/demo/">Try the live demo <span class="arrow">→</span></a>
+          <a class="btn btn-ghost" href="/projects/">Explore the work</a>
         </div>
       </div>
       <div class="scroll-cue" aria-hidden="true"><span class="bar"></span>scroll</div>
     </section>
 
     <!-- THESIS FLOW -->
-    <section class="section" id="thesis">
+    <section class="section" id="thesis" data-nav="Thesis">
       <div class="container">
         <div class="section-head reveal">
           <p class="eyebrow">The thesis</p>
@@ -134,22 +133,22 @@
     </section>
 
     <!-- ARCHITECTURE -->
-    <section class="section" id="architecture">
+    <section class="section" id="architecture" data-nav="Architecture">
       <div class="container">
         <div class="arch">
           <div class="stack reveal" aria-label="Product architecture">
             <div class="layer-verticals">
-              <div class="layer-vertical">
+              <div class="layer-vertical" data-detail="<strong>Playbook</strong> inherits the entire foundation and adds only athletics-recruiting logic on top.">
                 <h4>Playbook</h4>
                 <p>Athletics recruiting intelligence. In development.</p>
               </div>
-              <div class="layer-vertical">
+              <div class="layer-vertical" data-detail="<strong>Blackletter</strong> is a second vertical, set to reuse the same foundation once its use case is scoped.">
                 <h4>Blackletter</h4>
                 <p>A second vertical. Exploratory.</p>
               </div>
             </div>
             <div class="layer-connector" aria-hidden="true"></div>
-            <div class="layer">
+            <div class="layer" data-detail="<strong>Aletheia</strong> adds multi-source synthesis and reasoning on top of Manifest, turning retrieval into analysis.">
               <div class="layer-row">
                 <h3>Aletheia</h3>
                 <span class="chip building"><span class="dot"></span>reasoning</span>
@@ -157,13 +156,14 @@
               <p>The reasoning layer. Multi-source synthesis and analysis on top of the foundation.</p>
             </div>
             <div class="layer-connector" aria-hidden="true"></div>
-            <div class="layer layer-foundation">
+            <div class="layer layer-foundation" data-detail="<strong>Manifest</strong> provides ingestion, embeddings, vector search, and sourcing. Everything above inherits all four for free.">
               <div class="layer-row">
                 <h3>Manifest</h3>
                 <span class="layer-meta">the foundation</span>
               </div>
               <p>Ingest, embed, search, and cite. The infrastructure every vertical runs on.</p>
             </div>
+            <p class="stack-detail" aria-live="polite">Hover or tap a layer to see what it provides, and what the layer above inherits.</p>
           </div>
           <div class="arch-copy reveal" data-delay="1">
             <p class="eyebrow">Architecture, not a portfolio</p>
@@ -209,7 +209,7 @@
     </section>
 
     <!-- EVIDENCE / WORK -->
-    <section class="section" id="work">
+    <section class="section" id="work" data-nav="Work">
       <div class="container">
         <div class="section-head reveal">
           <p class="eyebrow">Evidence</p>
@@ -282,7 +282,7 @@
     </section>
 
     <!-- ARTICLES TEASER -->
-    <section class="section" id="writing">
+    <section class="section" id="writing" data-nav="Writing">
       <div class="container">
         <div class="section-head reveal">
           <p class="eyebrow">Writing</p>
@@ -318,7 +318,7 @@
     </section>
 
     <!-- CTA -->
-    <section class="section">
+    <section class="section" id="connect" data-nav="Get in touch">
       <div class="container">
         <div class="cta-band reveal">
           <p class="eyebrow" style="justify-content:center">Building in the open.</p>
