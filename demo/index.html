@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Live demo · 3wh.dev</title>
+  <meta name="description" content="A working slice of Manifest running entirely in your browser: ask a question, watch it embed, search, and answer with cited sources. An engine, not a chatbot.">
+  <meta name="theme-color" content="#0a0b0f">
+  <link rel="canonical" href="https://3wh.dev/demo/">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Live demo · 3wh.dev">
+  <meta property="og:description" content="Ask a question and watch the pipeline embed, search, and answer with cited sources. Runs entirely in your browser.">
+  <link rel="icon" href="/favicon.ico" type="image/x-icon">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <link rel="manifest" href="/site.webmanifest">
+  <meta property="og:image" content="https://3wh.dev/og.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="https://3wh.dev/og.png">
+  <link rel="preload" href="/fonts/grotesk-var.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/fonts/inter-var.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/style/main.css">
+  <script>(function(){var d=document.documentElement;d.classList.add('js');try{if(localStorage.getItem('theme')==='light')d.classList.add('light')}catch(e){}})();</script>
+  <style>
+    .demo { max-width: 900px; }
+    .demo-card { border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-2); padding: clamp(1.2rem, 3.5vw, 2rem); }
+    .demo-form { display: flex; gap: 0.7rem; flex-wrap: wrap; }
+    .demo-input {
+      flex: 1; min-width: 220px; font-family: var(--font-body); font-size: 1rem; color: var(--text);
+      background: var(--bg-1); border: 1px solid var(--border-strong); border-radius: 999px;
+      padding: 0.85rem 1.2rem; outline: none; transition: border-color .2s var(--ease), box-shadow .2s var(--ease);
+    }
+    .demo-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--ring); }
+    .demo-presets { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 1rem; }
+    .preset {
+      font-family: var(--font-mono); font-size: 0.78rem; color: var(--text-muted);
+      background: var(--bg-1); border: 1px solid var(--border); border-radius: 999px;
+      padding: 0.4rem 0.8rem; cursor: pointer; transition: color .2s var(--ease), border-color .2s var(--ease), background .2s var(--ease);
+    }
+    .preset:hover { color: var(--text); border-color: var(--accent); }
+
+    .dpipe { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin-top: 1.6rem; font-family: var(--font-mono); font-size: 0.8rem; }
+    .dstep { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.4rem 0.8rem; border: 1px solid var(--border); border-radius: 999px; color: var(--text-faint); background: var(--bg-1); transition: color .25s var(--ease), border-color .25s var(--ease), box-shadow .25s var(--ease); }
+    .dstep .d-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text-faint); transition: background .25s var(--ease), box-shadow .25s var(--ease); }
+    .dstep.active { color: var(--accent); border-color: rgba(255,90,95,0.4); }
+    .dstep.active .d-dot { background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+    .dstep.done { color: var(--text-muted); }
+    .dpipe .d-arrow { color: var(--text-faint); opacity: 0.5; }
+
+    .vec { display: none; align-items: flex-end; gap: 3px; height: 34px; margin-top: 1.2rem; }
+    .vec.show { display: flex; }
+    .vec span { width: 6px; background: var(--grad); border-radius: 2px; transition: height .4s var(--ease); }
+
+    .demo-out { margin-top: 1.6rem; display: none; }
+    .demo-out.show { display: block; }
+    .answer { border: 1px solid transparent; border-radius: var(--radius); padding: 1.3rem 1.4rem; position: relative;
+      background: linear-gradient(var(--bg-1), var(--bg-1)) padding-box, var(--grad) border-box; border: 1px solid transparent; box-shadow: var(--glow); }
+    .answer .a-label { font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent); }
+    .answer .a-text { margin-top: 0.6rem; font-size: 1.05rem; color: var(--text); line-height: 1.6; }
+    .cite { font-family: var(--font-mono); font-size: 0.72rem; color: var(--accent-ink); background: var(--grad); border-radius: 5px; padding: 0.05rem 0.4rem; margin-left: 0.3rem; vertical-align: 1px; white-space: nowrap; }
+
+    .src-head { font-family: var(--font-mono); font-size: 0.74rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-faint); margin: 1.6rem 0 0.8rem; }
+    .src { border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0.9rem 1.1rem; background: var(--bg-1); margin-bottom: 0.7rem; }
+    .src-top { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 0.4rem; }
+    .src-id { font-family: var(--font-mono); font-size: 0.74rem; color: var(--text-muted); display: inline-flex; align-items: center; gap: 0.5rem; }
+    .src-id .n { color: var(--accent); }
+    .score { font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-faint); display: inline-flex; align-items: center; gap: 0.5rem; }
+    .score .bar { width: 64px; height: 5px; border-radius: 3px; background: var(--bg-3); overflow: hidden; }
+    .score .bar i { display: block; height: 100%; background: var(--grad); }
+    .src-text { color: var(--text-muted); font-size: 0.92rem; line-height: 1.55; }
+    .src-text mark { background: rgba(255,90,95,0.18); color: var(--text); border-radius: 3px; padding: 0 2px; }
+    .demo-note { font-family: var(--font-mono); font-size: 0.78rem; color: var(--text-faint); border-left: 2px solid var(--accent); padding-left: 0.9rem; margin-top: 1.8rem; line-height: 1.6; }
+    .empty { color: var(--text-muted); font-size: 0.95rem; }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <header class="site-header">
+    <div class="container header-inner">
+      <a class="brand" href="/" aria-label="3wh.dev home">
+        <svg class="brand-mark" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+          <defs>
+            <linearGradient id="bmg" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
+              <stop stop-color="#ff5a5f"/><stop offset="1" stop-color="#ff8a5c"/>
+            </linearGradient>
+          </defs>
+          <g class="bm-grid" fill="url(#bmg)">
+            <circle cx="11" cy="7" r="1.5"/><circle cx="16" cy="7" r="1.5"/><circle cx="21" cy="7" r="1.5"/>
+            <circle cx="11" cy="11.5" r="1.5"/><circle cx="16" cy="11.5" r="1.5"/><circle cx="21" cy="11.5" r="1.5"/>
+            <circle cx="11" cy="16" r="1.5"/><circle cx="16" cy="16" r="1.5"/><circle cx="21" cy="16" r="1.5"/>
+            <circle cx="11" cy="20.5" r="1.5"/><circle cx="16" cy="20.5" r="1.5"/><circle cx="21" cy="20.5" r="1.5"/>
+            <circle cx="11" cy="25" r="1.5"/><circle cx="16" cy="25" r="1.5"/><circle cx="21" cy="25" r="1.5"/>
+          </g>
+          <g class="bm-lit" fill="url(#bmg)">
+            <circle cx="11" cy="7" r="1.8"/><circle cx="16" cy="7" r="1.8"/><circle cx="21" cy="7" r="1.8"/>
+            <circle cx="21" cy="11.5" r="1.8"/>
+            <circle cx="11" cy="16" r="1.8"/><circle cx="16" cy="16" r="1.8"/><circle cx="21" cy="16" r="1.8"/>
+            <circle cx="21" cy="20.5" r="1.8"/>
+            <circle cx="11" cy="25" r="1.8"/><circle cx="16" cy="25" r="1.8"/><circle cx="21" cy="25" r="1.8"/>
+          </g>
+        </svg>
+        <span class="brand-word">3wh<span class="brand-dot">.dev</span></span>
+      </a>
+      <nav class="site-nav" aria-label="Primary">
+        <ul class="nav-links">
+          <li><a href="/">Home</a></li>
+          <li><a href="/about/">About</a></li>
+          <li><a href="/projects/" class="is-active" aria-current="page">Projects</a></li>
+          <li><a href="/articles/">Articles</a></li>
+          <li><a href="/contact/">Contact</a></li>
+        </ul>
+        <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Switch to light theme">
+          <span class="theme-ico" aria-hidden="true">◐</span>
+          <span class="theme-toggle-label">Light</span>
+        </button>
+        <button id="hamburger" class="hamburger" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links">
+          <span></span><span></span><span></span>
+        </button>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main">
+    <section class="page-head">
+      <div class="container">
+        <p class="eyebrow reveal">Live demo</p>
+        <h1 class="reveal" data-delay="1">See the engine <span class="grad-text">think.</span></h1>
+        <p class="lead reveal" data-delay="2">
+          Ask a question. Watch it embed the query, search a small built-in corpus, and answer
+          with its sources attached. This is the difference between an engine and a chatbot:
+          every answer can be traced back.
+        </p>
+      </div>
+    </section>
+
+    <section class="section" style="padding-top:0">
+      <div class="container">
+        <div class="demo reveal">
+          <div class="demo-card">
+            <form class="demo-form" id="demo-form" autocomplete="off">
+              <input class="demo-input" id="q" type="text" placeholder="Ask about Manifest, retrieval, the architecture…" aria-label="Ask a question">
+              <button class="btn btn-primary" type="submit">Run <span class="arrow">→</span></button>
+            </form>
+            <div class="demo-presets" id="presets" aria-label="Example questions"></div>
+
+            <div class="dpipe" id="dpipe" aria-hidden="true">
+              <span class="dstep" data-step="0"><span class="d-dot"></span>ingest</span><span class="d-arrow">→</span>
+              <span class="dstep" data-step="1"><span class="d-dot"></span>embed</span><span class="d-arrow">→</span>
+              <span class="dstep" data-step="2"><span class="d-dot"></span>search</span><span class="d-arrow">→</span>
+              <span class="dstep" data-step="3"><span class="d-dot"></span>cite</span>
+            </div>
+            <div class="vec" id="vec" aria-hidden="true"></div>
+
+            <div class="demo-out" id="out" aria-live="polite"></div>
+          </div>
+
+          <p class="demo-note">
+            // This runs a lightweight retrieval over a built-in corpus, entirely in your browser, with
+            no network calls. It mirrors how Manifest works end to end: embed, search, and answer with
+            sources. The production engine uses neural embeddings and pgvector over real documents at scale.
+          </p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-bottom" style="border-top:0;margin-top:0">
+        <span>© 2026 3wh.dev. All rights reserved.</span>
+        <span class="mono"><a href="/">3wh.dev</a> · intelligence infrastructure</span>
+      </div>
+    </div>
+  </footer>
+
+  <script src="/script.js"></script>
+  <script src="/demo/demo.js"></script>
+</body>
+</html>

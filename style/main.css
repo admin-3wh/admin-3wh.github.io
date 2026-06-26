@@ -4,6 +4,11 @@
    Hand-rolled. No framework, no build step.
    ============================================================ */
 
+/* self-hosted brand fonts (variable woff2, no third-party requests) */
+@font-face { font-family: "Inter"; font-style: normal; font-weight: 400 600; font-display: swap; src: url("/fonts/inter-var.woff2") format("woff2"); }
+@font-face { font-family: "JetBrains Mono"; font-style: normal; font-weight: 400 500; font-display: swap; src: url("/fonts/jbmono-var.woff2") format("woff2"); }
+@font-face { font-family: "Space Grotesk"; font-style: normal; font-weight: 500 700; font-display: swap; src: url("/fonts/grotesk-var.woff2") format("woff2"); }
+
 /* ---------- Tokens ---------- */
 :root {
   /* dark theme (default) */
@@ -623,6 +628,40 @@ html.js .reveal.in { opacity: 1; transform: none; }
 
 /* dragging a node in the hero graph */
 body.grabbing, body.grabbing * { cursor: grabbing !important; }
+
+/* ---------- Scroll progress (every page) ---------- */
+.scroll-progress { position: fixed; top: 0; left: 0; height: 2px; width: 0; z-index: 200; background: var(--grad); box-shadow: 0 0 10px var(--ring); transition: width 0.1s linear; }
+
+/* ---------- Section node-nav (long pages) ---------- */
+.pagenav { position: fixed; right: clamp(0.6rem, 2vw, 1.4rem); top: 50%; transform: translateY(-50%); z-index: 90; display: flex; flex-direction: column; gap: 0.85rem; }
+.pagenav button { position: relative; width: 14px; height: 14px; padding: 0; border: 0; background: transparent; cursor: pointer; display: grid; place-items: center; }
+.pagenav .nd { width: 7px; height: 7px; border-radius: 50%; background: var(--text-faint); opacity: 0.5; transition: width 0.25s var(--ease), height 0.25s var(--ease), background 0.25s var(--ease), opacity 0.25s var(--ease), box-shadow 0.25s var(--ease); }
+.pagenav button:hover .nd { opacity: 1; background: var(--accent); }
+.pagenav button.active .nd { opacity: 1; width: 10px; height: 10px; background: var(--accent); box-shadow: 0 0 10px var(--accent); }
+.pagenav .nl { position: absolute; right: 22px; top: 50%; transform: translateY(-50%) translateX(6px); white-space: nowrap; font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-muted); background: color-mix(in srgb, var(--bg-2) 90%, transparent); border: 1px solid var(--border); border-radius: 6px; padding: 0.22rem 0.55rem; opacity: 0; pointer-events: none; transition: opacity 0.2s var(--ease), transform 0.2s var(--ease); }
+.pagenav button:hover .nl, .pagenav button.active .nl { opacity: 1; transform: translateY(-50%) translateX(0); }
+@media (max-width: 1180px) { .pagenav { display: none; } }
+
+/* ---------- Interactive architecture stack ---------- */
+.stack [data-detail] { cursor: pointer; }
+.stack.has-sel .layer:not(.sel), .stack.has-sel .layer-vertical:not(.sel) { opacity: 0.5; }
+.stack .layer.sel { border-color: var(--accent); box-shadow: var(--glow); transform: translateX(6px); }
+.stack .layer-vertical.sel { border-style: solid; border-color: var(--accent); box-shadow: var(--glow); }
+.stack-detail { grid-column: 1 / 2; margin-top: 1.1rem; min-height: 3.4rem; font-size: 0.94rem; color: var(--text-muted); border-left: 2px solid var(--accent); padding-left: 0.95rem; transition: opacity 0.2s var(--ease); }
+.stack-detail strong { color: var(--text); }
+@media (max-width: 900px) { .stack-detail { grid-column: 1; } }
+
+/* ---------- Manifest pipeline diagram ---------- */
+.mdiagram-fig { margin: 2.4rem 0; }
+.mdiagram { width: 100%; height: auto; display: block; }
+.mdiagram-fig figcaption { font-family: var(--font-mono); font-size: 0.78rem; color: var(--text-faint); margin-top: 0.7rem; text-align: center; }
+.mdiagram .mbox { fill: var(--bg-2); stroke: var(--border-strong); stroke-width: 1.2; }
+.mdiagram .mbox-hi { fill: var(--bg-2); stroke: var(--accent); stroke-width: 1.5; }
+.mdiagram .mtitle { font-family: var(--font-display); font-size: 13px; font-weight: 600; fill: var(--text); }
+.mdiagram .msub { font-family: var(--font-mono); font-size: 8.5px; fill: var(--text-muted); }
+.mdiagram .marrow { stroke: var(--accent); stroke-width: 1.4; fill: none; opacity: 0.55; }
+.mdiagram .mcap { font-family: var(--font-mono); font-size: 9px; fill: var(--text-faint); }
+.mdiagram .mhead { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.12em; fill: var(--accent); }
 
 /* ---------- Reduced motion ---------- */
 @media (prefers-reduced-motion: reduce) {

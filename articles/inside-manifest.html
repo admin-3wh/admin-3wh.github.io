@@ -18,9 +18,8 @@
   <meta property="og:image:height" content="630">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:image" content="https://3wh.dev/og.png">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="preload" href="/fonts/grotesk-var.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/fonts/inter-var.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="/style/main.css">
   <script>(function(){var d=document.documentElement;d.classList.add('js');try{if(localStorage.getItem('theme')==='light')d.classList.add('light')}catch(e){}})();</script>
 </head>
@@ -98,6 +97,34 @@
           <code>pgvector</code> extension lets the same database that stores the documents also store and
           search their embeddings, which keeps the architecture simple: one store, not a separate vector
           database to keep in sync.</p>
+
+        <figure class="mdiagram-fig" aria-label="The Manifest pipeline: ingest, embed, store in pgvector, search, then cite.">
+          <svg class="mdiagram" viewBox="0 0 760 168" role="img">
+            <text class="mhead" x="30" y="26">HOW A QUESTION MOVES THROUGH MANIFEST</text>
+            <path class="marrow" d="M148 86 H172 M168 82 L172 86 L168 90"/>
+            <path class="marrow" d="M294 86 H318 M314 82 L318 86 L314 90"/>
+            <path class="marrow" d="M440 86 H464 M460 82 L464 86 L460 90"/>
+            <path class="marrow" d="M586 86 H610 M606 82 L610 86 L606 90"/>
+            <rect class="mbox" x="30" y="58" width="116" height="56" rx="10"/>
+            <rect class="mbox" x="176" y="58" width="116" height="56" rx="10"/>
+            <rect class="mbox-hi" x="322" y="58" width="116" height="56" rx="10"/>
+            <rect class="mbox" x="468" y="58" width="116" height="56" rx="10"/>
+            <rect class="mbox" x="614" y="58" width="116" height="56" rx="10"/>
+            <text class="mtitle" x="88" y="84" text-anchor="middle">Ingest</text>
+            <text class="msub" x="88" y="100" text-anchor="middle">parse · clean</text>
+            <text class="mtitle" x="234" y="84" text-anchor="middle">Embed</text>
+            <text class="msub" x="234" y="100" text-anchor="middle">chunk · vector</text>
+            <text class="mtitle" x="380" y="84" text-anchor="middle">Store</text>
+            <text class="msub" x="380" y="100" text-anchor="middle">pgvector</text>
+            <text class="mtitle" x="526" y="84" text-anchor="middle">Search</text>
+            <text class="msub" x="526" y="100" text-anchor="middle">similarity</text>
+            <text class="mtitle" x="672" y="84" text-anchor="middle">Cite</text>
+            <text class="msub" x="672" y="100" text-anchor="middle">with sources</text>
+            <path class="marrow" d="M380 114 V130" style="opacity:.4"/>
+            <text class="mcap" x="380" y="146" text-anchor="middle">one store: documents + their embeddings</text>
+          </svg>
+          <figcaption>One question, five stages. Every answer comes back with the sources it was drawn from.</figcaption>
+        </figure>
 
         <h2>1 · Ingest</h2>
         <p>Everything starts with acquisition. Manifest accepts documents, URLs, and raw text. Each source
